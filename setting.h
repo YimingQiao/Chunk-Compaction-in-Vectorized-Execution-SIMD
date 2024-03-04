@@ -13,7 +13,7 @@
 namespace compaction {
 
 // query setting
-size_t kJoins = 4;
+size_t kJoins = 3;
 size_t kLHSTupleSize = 2e7;
 size_t kRHSTupleSize = 2e6;
 size_t kChunkFactor = 6;

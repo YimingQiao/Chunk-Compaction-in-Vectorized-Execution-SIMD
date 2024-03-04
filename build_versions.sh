@@ -13,6 +13,7 @@ declare -A compaction_options=(
 project_name="compaction"
 
 # Loop through all compaction options and compile projects
+# shellcheck disable=SC2068
 for key in ${!compaction_options[@]}; do
     # Create a unique build directory for each option
     mkdir -p build-${key}
