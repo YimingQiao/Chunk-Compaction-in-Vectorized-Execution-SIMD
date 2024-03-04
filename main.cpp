@@ -1,6 +1,5 @@
 #include <iostream>
 #include <random>
-#include <cstring>
 
 #include "base.h"
 #include "hash_table.h"
@@ -14,7 +13,7 @@ using namespace compaction;
 struct PipelineState {
   vector<unique_ptr<HashTable>> hts;
   vector<unique_ptr<DataChunk>> intermediates;
-  vector<unique_ptr<Compactor>> compactors;
+  vector<unique_ptr<NaiveCompactor>> compactors;
 
   PipelineState() : hts(kJoins), intermediates(kJoins), compactors(kJoins) {}
 };
@@ -23,7 +22,15 @@ static void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollecti
 
 void FlushPipelineCache(PipelineState &state, DataCollection &result_table, size_t level);
 
-std::vector<size_t> ParseList(const std::string &s);
+std::vector<size_t> ParseList(const std::string &s) {
+  std::stringstream ss(s.substr(1, s.size() - 2)); // Ignore brackets
+  std::vector<size_t> result;
+  std::string item;
+  while (std::getline(ss, item, ',')) {
+    result.push_back(std::stoi(item));
+  }
+  return result;
+}
 
 void ParseParameters(int argc, char *argv[]);
 
@@ -60,17 +67,11 @@ int main(int argc, char *argv[]) {
     types.push_back(AttributeType::INTEGER);
     types.push_back(AttributeType::STRING);
     intermediates[i] = std::make_unique<DataChunk>(types);
-    compactors[i] = std::make_unique<Compactor>(types);
+    compactors[i] = std::make_unique<NaiveCompactor>(types);
   }
 
   // create the result_table collection
   DataCollection result_table(types);
-
-#ifdef flag_dynamic_compact
-  // create MAB for each join operator
-  for (size_t i = 0; i < kJoins; ++i) CompactTuner::Get().Initialize(size_t(&state.compactors[i]));
-#endif
-  // -----------------------------------------------------------------------------------------------------------
 
   double latency = 0;
   Profiler timer;
@@ -90,9 +91,10 @@ int main(int argc, char *argv[]) {
       latency += timer.Elapsed();
     } while (end < kLHSTupleSize);
 
-#if defined(flag_full_compact) || defined(flag_binary_compact) || defined(flag_dynamic_compact)
+#ifdef flag_full_compact
     timer.Start();
     {
+      // Flush the tuples in cache.
       FlushPipelineCache(state, result_table, 0);
     }
     latency += timer.Elapsed();
@@ -103,7 +105,6 @@ int main(int argc, char *argv[]) {
   std::cerr << "[Total Time]: " << latency << "s\n";
   BeeProfiler::Get().EndProfiling();
   ZebraProfiler::Get().ToCSV();
-  CompactTuner::Get().Reset();
 
   if (flag_collect_tuples) {
     // show the joined result.
@@ -129,26 +130,11 @@ void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollection &res
   auto &result = intermediates[level];
   auto &compactor = compactors[level];
 
-#ifdef flag_dynamic_compact
-  // ---------------------------------- learn compaction thresholds -------------------------------------
-  Profiler profiler;
-  profiler.Start();
-  // 1. Get a compaction threshold
-  // 2. Start to record execution time
-  size_t threshold = CompactTuner::Get().SelectArm(level);
-  compactor->SetThreshold(threshold);
-
-  BeeProfiler::Get().InsertStatRecord("[UCB Get Thresholds]", profiler.Elapsed());
-
-  profiler.Start();
-  // -----------------------------------------------------------------------------------------------------
-#endif
-
-  auto ss = hts[level]->Probe(join_key, input.count_, input.selection_vector_);
+  auto ss = hts[level]->Probe(join_key);
   while (ss.HasNext()) {
-    ss.Next(join_key, input, *result);
+    ss.Next(join_key, input, *result, kEnableLogicalCompact);
 
-#if defined(flag_full_compact) || defined(flag_binary_compact) || defined(flag_dynamic_compact)
+#ifdef flag_full_compact
     // A compactor sits here.
     compactor->Compact(result);
     if (result->count_ == 0) continue;
@@ -156,15 +142,6 @@ void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollection &res
 
     ExecutePipeline(*result, state, result_table, level + 1);
   }
-
-#ifdef flag_dynamic_compact
-  // ---------------------------------- learn compaction thresholds -------------------------------------
-  double time = profiler.Elapsed();
-  profiler.Start();
-  CompactTuner::Get().UpdateArm(level, compactor->GetThreshold(), 2 / time / 1e3);
-  BeeProfiler::Get().InsertStatRecord("[UCB Update]", profiler.Elapsed());
-  // -----------------------------------------------------------------------------------------------------
-#endif
 }
 
 void FlushPipelineCache(PipelineState &state, DataCollection &result_table, size_t level) {
@@ -225,8 +202,9 @@ void ParseParameters(int argc, char **argv) {
 
   // show the setting
   std::cerr << "------------------ Setting ------------------\n";
-  std::cerr << "Strategy: " << strategy_name << "\n"
-            << "Number of Joins: " << kJoins << "\n"
+  if (kEnableLogicalCompact) std::cerr << "Strategy: logical_compaction\n";
+  else std::cerr << "Compaction Strategy: no_compaction\n";
+  std::cerr << "Number of Joins: " << kJoins << "\n"
             << "Number of LHS Tuple: " << kLHSTupleSize << "\n"
             << "Number of RHS Tuple: " << kRHSTupleSize << "\n"
             << "Chunk Factor: " << kChunkFactor << "\n";
@@ -235,15 +213,5 @@ void ParseParameters(int argc, char **argv) {
     if (i != kJoins - 1) std::cerr << kRHSPayLoadLength[i] << ",";
     else std::cerr << kRHSPayLoadLength[i] << "]\n";
   }
-}
-
-std::vector<size_t> ParseList(const string &s) {
-  std::stringstream ss(s.substr(1, s.size() - 2)); // Ignore brackets
-  std::vector<size_t> result;
-  std::string item;
-  while (std::getline(ss, item, ',')) {
-    result.push_back(std::stoi(item));
-  }
-  return result;
 }
 
