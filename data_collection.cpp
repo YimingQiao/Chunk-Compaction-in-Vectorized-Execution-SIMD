@@ -45,10 +45,6 @@ void compaction::DataCollection::Print(size_t n_tuple) {
           std::cout << std::get<double>(tuple[j]) << ", ";
           break;
         }
-        case AttributeType::STRING: {
-          std::cout << std::get<std::string>(tuple[j]) << ", ";
-          break;
-        }
         case AttributeType::INVALID:break;
       }
     }

@@ -7,19 +7,13 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor, size_t payload_le
   for (auto &bucket : linked_lists_) bucket = std::make_unique<list<Tuple>>();
 
   // Tuple in Hash Table
-  string payload_name;
-  if (payload_length > 0) {
-    payload_name = "payload_";
-    payload_name += string(payload_length, 'x');
-    payload_name += "_";
-  }
   vector<Tuple> rhs_table(n_rhs_tuples);
   size_t cnt = 0;
   const size_t num_unique = n_rhs_tuples / chunk_factor + (n_rhs_tuples % chunk_factor != 0);
   for (size_t i = 0; i < num_unique; ++i) {
     auto unique_value = i * (n_rhs_tuples / num_unique);
     for (size_t j = 0; j < chunk_factor && cnt < n_rhs_tuples; ++j) {
-      auto payload = payload_name + std::to_string(cnt) + "|";
+      auto payload = cnt + 10000000;
       rhs_table[cnt].attrs_.emplace_back(unique_value);
       rhs_table[cnt].attrs_.emplace_back(payload);
       ++cnt;
@@ -130,4 +124,4 @@ void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_ve
     }
   }
 }
-}
+}// namespace compaction

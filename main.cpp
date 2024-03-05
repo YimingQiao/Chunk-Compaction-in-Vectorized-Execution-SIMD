@@ -42,10 +42,10 @@ int main(int argc, char *argv[]) {
     // create probe table: (id1, id2, ..., idn, miscellaneous)
     vector<AttributeType> types;
     for (size_t i = 0; i < kJoins; ++i) types.push_back(AttributeType::INTEGER);
-    types.push_back(AttributeType::STRING);
+    types.push_back(AttributeType::INTEGER);
     compaction::DataCollection table(types);
     vector<compaction::Attribute> tuple(kJoins + 1);
-    tuple[kJoins] = "|";
+    tuple[kJoins] = size_t(9999999);
     for (size_t i = 0; i < kLHSTupleSize; ++i) {
         for (size_t j = 0; j < kJoins; ++j) tuple[j] = size_t(dist(gen));
         table.AppendTuple(tuple);
@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
     for (size_t i = 0; i < kJoins; ++i) {
         hts[i] = std::make_unique<HashTable>(kRHSTupleSize, kChunkFactor, kRHSPayLoadLength[i]);
         types.push_back(AttributeType::INTEGER);
-        types.push_back(AttributeType::STRING);
+        types.push_back(AttributeType::INTEGER);
         intermediates[i] = std::make_unique<DataChunk>(types);
         compactors[i] = std::make_unique<Compactor>(types);
     }

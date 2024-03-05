@@ -30,12 +30,11 @@ using idx_t = size_t;
 constexpr size_t kBlockSize = 2048;
 
 // Attribute includes three types: integer, float-point number, and the string.
-using Attribute = std::variant<size_t, double, std::string>;
+using Attribute = std::variant<size_t, double>;
 
 enum class AttributeType : uint8_t {
   INTEGER = 0,
   DOUBLE = 1,
-  STRING = 2,
   INVALID = 3
 };
 

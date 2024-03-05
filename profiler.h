@@ -16,6 +16,10 @@
 #include <atomic>
 #include <chrono>
 #include <algorithm>
+#include <unordered_map>
+#include <vector>
+
+#include "base.h"
 
 namespace compaction {
 using std::mutex;
