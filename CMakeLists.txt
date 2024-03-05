@@ -2,8 +2,6 @@ cmake_minimum_required(VERSION 3.10)
 project(Compaction-Project-SIMD)
 
 set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=native")
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -35,7 +33,21 @@ add_executable(compaction main.cpp
         simd_hash_table.cpp
         simd_hash_table.h)
 
-add_executable(simd_compaction simd_main.cpp)
+target_compile_options(compaction PRIVATE -march=native)
 
-# If you have any libraries, you can link them like this:
-# target_link_libraries(YourProjectName your_library)
+# AVX512 hand-writing code, w/ -march=native
+add_executable(avx512_hash avx512_hash.cpp)
+target_compile_options(avx512_hash PRIVATE -march=native -funroll-loops)
+
+# Scalar code, w/ -march=native
+add_executable(scalar_hash_native scalar_hash.cpp)
+target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
+
+# Scalar code, w/o -march=native
+add_executable(scalar_hash scalar_hash.cpp)
+target_compile_options(scalar_hash PRIVATE -funroll-loops)
+
+
+
+
+
