@@ -1,16 +1,10 @@
-#include <vector>
-#include <cstdint>
+#include "simd_base.h"
 
-// using Attribute = std::variant<int64_t, double, char[24]>;
-using Attribute = int64_t;
-const uint64_t kNumKeys = 1024;
-const uint64_t kNumBuckets = 1024;
-
-// It uses AVX2 gather if inlined, otherwise use scalar.
+// It uses AVX2 gather if inlined, otherwise use scalar gather.
 inline std::vector<int64_t> &GetVector(const std::vector<Attribute> &keys, const std::vector<uint32_t> &sel_vector, std::vector<int64_t> &loaded_keys) {
   for (uint64_t i = 0; i < kNumKeys; i += 8) {
-    int64_t key0 = keys[sel_vector[i]];
-    loaded_keys[i] = key0;
+    int64_t key0 = keys[sel_vector[i + 0]];
+    loaded_keys[i + 0] = key0;
 
     int64_t key1 = keys[sel_vector[i + 1]];
     loaded_keys[i + 1] = key1;

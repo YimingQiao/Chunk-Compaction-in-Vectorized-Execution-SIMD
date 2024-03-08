@@ -19,12 +19,14 @@ for (uint64_t i = 0; i < kNumKeys; i ++) {
     buckets[i] = HashFunction(key) & (kNumBuckets - 1);
 }
 
-Scalar w/o -march=native (cycle per key)                Gather: 0.790038       Hash: 1.67039       Probe: 2.47652
-Scalar w/  -march=native (cycle per key)                Gather: 1.21528        Hash: 0.950555      Probe: 2.05726
-Scalar - scalar gather - simd hash (cycle per key)      Gather: 0.486667       Hash: 0.937748      Probe: 1.36146
-SIMD (cycle per key)                                    Gather: 0.396309       Hash: 0.644374      Probe: 1.05433
+Scalar w/o -march=native (cycle per key)                Gather: 0.506101	Hash: 1.86269	Probe: 2.36879
+Scalar w/  -march=native (cycle per key)                Gather: 1.18492	    Hash: 0.877449	Probe: 2.06237
+Scalar - scalar gather - simd hash (cycle per key)      Gather: 0.477295	Hash: 0.882568	Probe: 1.35986
+SIMD (cycle per key)                                    Gather: 0.398755	Hash: 0.626593	Probe: 1.02535
 
-    Comment: ``-march=native'' making the hash computation 1.75X faster with AVX2.
+    Comment:
+        1. Compiler auto-vectorizes the gather using AVX2, making it 2X slower than the scalar.
+        2. AVX512 is the fastest.
 
 
 ----------------------------------- Vector Scalar Probing Style 2 -----------------------------------
@@ -34,6 +36,10 @@ for (uint64_t i = 0; i < kNumKeys; i ++) {
     buckets[i] = HashFunction(key) & (kNumBuckets - 1);
 }
 
-Scalar w/o -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 1.95541
-Scalar w/  -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 2.11409
-SIMD (cycle per key)                                    Gather: ---       Hash: ---       Probe: 1.89111
+Scalar w/o -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 1.78797
+Scalar w/  -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 2.72101
+Scalar - scalar gather - simd hash (cycle per key)      Gather: ---       Hash: ---       Probe: 2.29194
+SIMD (cycle per key)                                    Gather: ---       Hash: ---       Probe: 1.34526
+
+    Comment:
+        1. We should not mix the gather and hash.
