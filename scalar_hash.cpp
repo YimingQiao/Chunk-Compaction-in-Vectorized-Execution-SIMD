@@ -6,11 +6,7 @@
 #include <x86intrin.h>
 
 #include "profiler.h"
-
-// using Attribute = std::variant<int64_t, double, char[24]>;
-using Attribute = int64_t;
-const uint64_t kNumKeys = 1024;
-const uint64_t kNumBuckets = 64;
+#include "scalar_gather.h"
 
 inline uint64_t murmurhash64(uint64_t x) {
   x ^= x >> 32;
@@ -53,45 +49,82 @@ int main(int argc, char *argv[]) {
   std::cout << "--------------- Scalar ---------------\n";
   {
     std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
+    std::vector<int64_t> loaded_keys(kNumKeys, 0);
     const uint64_t run_times = 65536;
     uint64_t start_cycles, end_cycles;
 
     start_cycles = __rdtsc();
 
-    for (uint32_t j = 0; j < run_times; j++)
+    for (uint32_t j = 0; j < run_times; j++) {
+      loaded_keys = GetVector(keys, sel_vector, loaded_keys);
+
       for (uint64_t i = 0; i < kNumKeys; i += 8) {
-        int64_t key0 = keys[sel_vector[i]];
+        int64_t key0 = loaded_keys[i];
         uint64_t hash0 = murmurhash64(key0);
         scalar_buckets[i] = hash0 & (kNumBuckets - 1) + j;
 
-        int64_t key1 = keys[sel_vector[i + 1]];
+        int64_t key1 = loaded_keys[i + 1];
         uint64_t hash1 = murmurhash64(key1);
         scalar_buckets[i + 1] = hash1 & (kNumBuckets - 1) + j;
 
-        int64_t key2 = keys[sel_vector[i + 2]];
+        int64_t key2 = loaded_keys[i + 2];
         uint64_t hash2 = murmurhash64(key2);
         scalar_buckets[i + 2] = hash2 & (kNumBuckets - 1) + j;
 
-        int64_t key3 = keys[sel_vector[i + 3]];
+        int64_t key3 = loaded_keys[i + 3];
         uint64_t hash3 = murmurhash64(key3);
         scalar_buckets[i + 3] = hash3 & (kNumBuckets - 1) + j;
 
-        int64_t key4 = keys[sel_vector[i + 4]];
+        int64_t key4 = loaded_keys[i + 4];
         uint64_t hash4 = murmurhash64(key4);
         scalar_buckets[i + 4] = hash4 & (kNumBuckets - 1) + j;
 
-        int64_t key5 = keys[sel_vector[i + 5]];
+        int64_t key5 = loaded_keys[i + 5];
         uint64_t hash5 = murmurhash64(key5);
         scalar_buckets[i + 5] = hash5 & (kNumBuckets - 1) + j;
 
-        int64_t key6 = keys[sel_vector[i + 6]];
+        int64_t key6 = loaded_keys[i + 6];
         uint64_t hash6 = murmurhash64(key6);
         scalar_buckets[i + 6] = hash6 & (kNumBuckets - 1) + j;
 
-        int64_t key7 = keys[sel_vector[i + 7]];
+        int64_t key7 = loaded_keys[i + 7];
         uint64_t hash7 = murmurhash64(key7);
         scalar_buckets[i + 7] = hash7 & (kNumBuckets - 1) + j;
       }
+      //      for (uint64_t i = 0; i < kNumKeys; i += 8) {
+      //        int64_t key0 = keys[sel_vector[i + 0]];
+      //        uint64_t hash0 = murmurhash64(key0);
+      //        scalar_buckets[i + 0] = hash0 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key1 = keys[sel_vector[i + 1]];
+      //        uint64_t hash1 = murmurhash64(key1);
+      //        scalar_buckets[i + 1] = hash1 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key2 = keys[sel_vector[i + 2]];
+      //        uint64_t hash2 = murmurhash64(key2);
+      //        scalar_buckets[i + 2] = hash2 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key3 = keys[sel_vector[i + 3]];
+      //        uint64_t hash3 = murmurhash64(key3);
+      //        scalar_buckets[i + 3] = hash3 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key4 = keys[sel_vector[i + 4]];
+      //        uint64_t hash4 = murmurhash64(key4);
+      //        scalar_buckets[i + 4] = hash4 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key5 = keys[sel_vector[i + 5]];
+      //        uint64_t hash5 = murmurhash64(key5);
+      //        scalar_buckets[i + 5] = hash5 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key6 = keys[sel_vector[i + 6]];
+      //        uint64_t hash6 = murmurhash64(key6);
+      //        scalar_buckets[i + 6] = hash6 & (kNumBuckets - 1) + j;
+      //
+      //        int64_t key7 = keys[sel_vector[i + 7]];
+      //        uint64_t hash7 = murmurhash64(key7);
+      //        scalar_buckets[i + 7] = hash7 & (kNumBuckets - 1) + j;
+      //      }
+    }
 
     end_cycles = __rdtsc();
 

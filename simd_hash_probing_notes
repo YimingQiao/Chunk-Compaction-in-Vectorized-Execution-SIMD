@@ -1,0 +1,39 @@
+Platform: Golf
+
+Workload:
+keys:           vector of uint64
+sel_vector:     vector of uint32
+buckets:        vector of uint64
+
+----------------------------------- Vector Scalar Probing Style 1 -----------------------------------
+std::vector<uint64_t> gathered_keys;
+
+// Gather
+for (uint64_t i = 0; i < kNumKeys; i ++) {
+    gathered_keys[i] = keys[sel_vector[i]];
+}
+
+// Hash
+for (uint64_t i = 0; i < kNumKeys; i ++) {
+    uint64 key = gathered_keys[i];
+    buckets[i] = HashFunction(key) & (kNumBuckets - 1);
+}
+
+Scalar w/o -march=native (cycle per key)                Gather: 0.790038       Hash: 1.67039       Probe: 2.47652
+Scalar w/  -march=native (cycle per key)                Gather: 1.21528        Hash: 0.950555      Probe: 2.05726
+Scalar - scalar gather - simd hash (cycle per key)      Gather: 0.486667       Hash: 0.937748      Probe: 1.36146
+SIMD (cycle per key)                                    Gather: 0.396309       Hash: 0.644374      Probe: 1.05433
+
+    Comment: ``-march=native'' making the hash computation 1.75X faster with AVX2.
+
+
+----------------------------------- Vector Scalar Probing Style 2 -----------------------------------
+// Gather and Hash
+for (uint64_t i = 0; i < kNumKeys; i ++) {
+    uint64 key = keys[sel_vector[i]];
+    buckets[i] = HashFunction(key) & (kNumBuckets - 1);
+}
+
+Scalar w/o -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 1.95541
+Scalar w/  -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 2.11409
+SIMD (cycle per key)                                    Gather: ---       Hash: ---       Probe: 1.89111

@@ -40,12 +40,21 @@ add_executable(avx512_hash avx512_hash.cpp)
 target_compile_options(avx512_hash PRIVATE -march=native -funroll-loops)
 
 # Scalar code, w/ -march=native
-add_executable(scalar_hash_native scalar_hash.cpp)
+add_executable(scalar_hash_native scalar_hash.cpp scalar_gather.h)
 target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
 
 # Scalar code, w/o -march=native
 add_executable(scalar_hash scalar_hash.cpp)
 target_compile_options(scalar_hash PRIVATE -funroll-loops)
+
+
+## Scalar code, w/ -march=native
+#add_executable(scalar_hash_native scalar_hash.cpp)
+#target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
+#
+## Gather code, without -march=native
+#add_library(scalar_gather scalar_gather.cpp)
+#target_link_libraries(scalar_hash_native scalar_gather)
 
 
 
