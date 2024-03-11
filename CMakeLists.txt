@@ -24,29 +24,16 @@ else ()
     add_definitions(-Dflag_no_compact)
 endif ()
 
-add_executable(compaction main.cpp
-        profiler.h
-        base.cpp
-        hash_table.cpp
-        data_collection.cpp
-        compactor.cpp
-        simd_hash_table.cpp
-        simd_hash_table.h)
-
-target_compile_options(compaction PRIVATE -march=native)
-
 # AVX512 hand-writing code, w/ -march=native
-add_executable(avx512_hash avx512_hash.cpp)
+add_executable(avx512_hash avx512_main.cpp hash_functions.h)
 target_compile_options(avx512_hash PRIVATE -march=native -funroll-loops)
 
 # Scalar code, w/ -march=native
-add_executable(scalar_hash_native scalar_hash.cpp scalar_gather.h
-        simd_base.h)
+add_executable(scalar_hash_native scalar_main.cpp base.cpp scalar_hash_table.cpp)
 target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
 
 # Scalar code, w/o -march=native
-add_executable(scalar_hash scalar_hash.cpp
-        simd_base.h)
+add_executable(scalar_hash scalar_main.cpp base.cpp scalar_hash_table.cpp)
 target_compile_options(scalar_hash PRIVATE -funroll-loops)
 
 

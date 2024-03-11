@@ -1,7 +1,6 @@
-
 #include "base.h"
 
-namespace compaction {
+namespace simd_compaction {
 
 void Vector::Reference(Vector &other) {
   assert(type_ == other.type_);
@@ -46,4 +45,4 @@ void DataChunk::Slice(DataChunk &other, vector<uint32_t> &selection_vector, size
     selection_vector_[i] = key_idx;
   }
 }
-}
+}// namespace simd_compaction

@@ -1,5 +1,5 @@
 //===----------------------------------------------------------------------===//
-//                         Compaction
+//                         SIMD Compaction
 //
 // profiler.h
 //
@@ -8,25 +8,25 @@
 
 #pragma once
 
+#include <algorithm>
+#include <atomic>
+#include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
-#include <random>
 #include <mutex>
-#include <atomic>
-#include <chrono>
-#include <algorithm>
+#include <random>
 #include <unordered_map>
 #include <vector>
 
 #include "base.h"
 
-namespace compaction {
-using std::mutex;
-using std::lock_guard;
+namespace simd_compaction {
 using std::atomic;
-using std::chrono::time_point;
+using std::lock_guard;
+using std::mutex;
 using std::chrono::system_clock;
+using std::chrono::time_point;
 
 //! The profiler can be used to measure elapsed time
 template<typename T>
@@ -267,7 +267,7 @@ class ZebraProfiler {
   }
 
   struct Histogram {
-    vector<atomic<size_t>> values_;  // in ns
+    vector<atomic<size_t>> values_;// in ns
     vector<atomic<size_t>> cnt_;
 
     Histogram() : values_(kBlockSize + 1), cnt_(kBlockSize + 1) {
@@ -282,5 +282,4 @@ class ZebraProfiler {
   std::mt19937 gen_;
   std::uniform_int_distribution<int> integers;
 };
-}  // namespace duckdb
-
+}// namespace simd_compaction

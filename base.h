@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//                         Compaction
+//                         SIMD Compaction
 //
 // base.h
 //
@@ -9,32 +9,36 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <variant>
-#include <iostream>
 #include <cassert>
+#include <iostream>
 #include <list>
+#include <memory>
 #include <unordered_map>
+#include <variant>
+#include <vector>
 
-namespace compaction {
+namespace simd_compaction {
+
+const uint64_t kNumKeys = 1024;
+const uint64_t kNumBuckets = 1024;
+const uint64_t kRunTimes = 65536;
+const uint64_t kLanes = 8;
+
 // Some data structures
-using std::vector;
 using std::list;
 using std::shared_ptr;
+using std::string;
 using std::unique_ptr;
 using std::unordered_map;
-using std::string;
-using idx_t = size_t;
+using std::vector;
 
 constexpr size_t kBlockSize = 2048;
 
 // Attribute includes three types: integer, float-point number, and the string.
-using Attribute = std::variant<size_t, double>;
+using Attribute = int64_t;
 
 enum class AttributeType : uint8_t {
   INTEGER = 0,
-  DOUBLE = 1,
   INVALID = 3
 };
 
@@ -42,6 +46,10 @@ enum class AttributeType : uint8_t {
 class Vector {
  public:
   AttributeType type_;
+
+  shared_ptr<vector<Attribute>> data_;
+
+  Vector() : type_(AttributeType::INTEGER), data_(std::make_shared<vector<Attribute>>(kBlockSize)) {}
 
   explicit Vector(AttributeType type) : type_(type), data_(std::make_shared<vector<Attribute>>(kBlockSize)) {}
 
@@ -51,8 +59,9 @@ class Vector {
     return (*data_)[idx];
   }
 
- private:
-  shared_ptr<vector<Attribute>> data_;
+  Attribute &operator[](size_t idx) {
+    return (*data_)[idx];
+  }
 };
 
 // A data chunk has some columns.
@@ -76,4 +85,4 @@ class DataChunk {
     for (size_t i = 0; i < kBlockSize; ++i) selection_vector_[i] = i;
   };
 };
-}
+}// namespace simd_compaction

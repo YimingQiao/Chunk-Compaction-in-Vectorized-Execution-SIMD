@@ -1,6 +1,6 @@
 //===----------------------------------------------------------------------===//
 //
-//                         Compaction
+//                         SIMD Compaction
 //
 // hash_table.h
 //
@@ -9,15 +9,17 @@
 
 #pragma once
 
+#include <functional>
 #include <list>
 #include <unordered_map>
-#include <functional>
 #include <utility>
 
 #include "base.h"
+#include "gather_functions.h"
+#include "hash_functions.h"
 #include "profiler.h"
 
-namespace compaction {
+namespace simd_compaction {
 
 class HashTable;
 
@@ -63,13 +65,18 @@ class ScanStructure {
 
 class HashTable {
  public:
-  HashTable(size_t n_rhs_tuples, size_t chunk_factor, size_t payload_length);
+  size_t n_buckets_;
+  vector<unique_ptr<list<Tuple>>> linked_lists_;
+
+  HashTable(size_t n_rhs_tuples, size_t chunk_factor);
 
   ScanStructure Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
 
  private:
-  size_t n_buckets_;
-  vector<unique_ptr<list<Tuple>>> linked_lists_;
-  std::hash<Attribute> hash_;
+  // Use murmur hash function
+  using HashFn = uint64_t (*)(uint64_t);
+  HashFn hash_ = &murmurhash64;
+
+  uint64_t bucket_mask_;
 };
-}
+}// namespace simd_compaction

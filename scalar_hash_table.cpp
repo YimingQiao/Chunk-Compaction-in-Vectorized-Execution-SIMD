@@ -1,8 +1,12 @@
-#include "hash_table.h"
+#include "scalar_hash_table.h"
 
-namespace compaction {
-HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor, size_t payload_length) {
-  n_buckets_ = 2 * n_rhs_tuples;
+namespace simd_compaction {
+HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor) {
+  // number of buckets should be the minimum exp number of 2.
+  n_buckets_ = 1;
+  while (n_buckets_ < 2 * n_rhs_tuples) n_buckets_ *= 2;
+
+  bucket_mask_ = n_buckets_ - 1;
   linked_lists_.resize(n_buckets_);
   for (auto &bucket : linked_lists_) bucket = std::make_unique<list<Tuple>>();
 
@@ -34,10 +38,14 @@ ScanStructure HashTable::Probe(Vector &join_key, size_t count, vector<uint32_t> 
   Profiler profiler;
   profiler.Start();
 
+  // gather keys
+  vector<Attribute> loaded_keys(kBlockSize);
+  ScalarGather(*join_key.data_, sel_vector, loaded_keys);
+
+  // hash and find buckets
   vector<list<Tuple> *> ptrs(kBlockSize);
   for (size_t i = 0; i < count; ++i) {
-    auto attr = join_key.GetValue(sel_vector[i]);
-    auto bucket_idx = hash_(attr) % n_buckets_;
+    uint64_t bucket_idx = hash_(loaded_keys[i]) & bucket_mask_;
     ptrs[i] = linked_lists_[bucket_idx].get();
   }
 
@@ -124,4 +132,4 @@ void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_ve
     }
   }
 }
-}// namespace compaction
+}// namespace simd_compaction
