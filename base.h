@@ -16,10 +16,11 @@
 #include <unordered_map>
 #include <variant>
 #include <vector>
+#include <immintrin.h>
 
 namespace simd_compaction {
 
-const uint64_t kNumKeys = 1024;
+const uint64_t kNumKeys = 2048;
 const uint64_t kNumBuckets = 1024;
 const uint64_t kRunTimes = 65536;
 const uint64_t kLanes = 8;
@@ -79,6 +80,8 @@ class DataChunk {
   void AppendTuple(vector<Attribute> &tuple);
 
   void Slice(DataChunk &other, vector<uint32_t> &selection_vector, size_t count);
+
+  void SIMDSlice(DataChunk &other, vector<uint32_t> &selection_vector, size_t count);
 
   void Reset() {
     count_ = 0;

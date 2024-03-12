@@ -36,13 +36,74 @@ int main(int argc, char *argv[]) {
     sel_vector[i] = i;
   }
 
-  HashTable hash_table(65536, 2);
+  HashTable hash_table(kNumKeys, 2);
+  DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
+  DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
+  input.data_[0] = keys;
+  input.count_ = kNumKeys;
 
   std::cout << "Sizeof(key): " << sizeof(keys[0]) << "\n";
   std::cout << "Workload Size: " << 8 * kNumKeys / 1024 << " KB\n";
 
   // this code is to be tested.
-  hash_table.Probe(keys, kNumKeys, sel_vector);
+  std::cout << "--------------- Scalar HashJoin ---------------\n";
+  {
+    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
+    uint32_t next_times = 0;
+
+    for (uint32_t j = 0; j < kRunTimes; j++) {
+      // Function Probe.
+      start_cycles = __rdtsc();
+      auto scan_structure = hash_table.Probe(keys, kNumKeys, sel_vector);
+      // hash_table.Probe(keys, kNumKeys, sel_vector);
+      end_cycles = __rdtsc();
+      probe_cycles += end_cycles - start_cycles;
+
+      // Function Next.
+      start_cycles = __rdtsc();
+      while (scan_structure.HasNext()) {
+        scan_structure.Next(keys, input, output);
+        next_times++;
+      }
+      end_cycles = __rdtsc();
+      next_cycles += end_cycles - start_cycles;
+    }
+    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
+    std::cout << "Next: " << next_cycles_per_tuple << "\n";
+    std::cout << "#chunks: " << next_times << "\n";
+  }
+
+  // this code is to be tested.
+  std::cout << "--------------- SIMD HashJoin ---------------\n";
+  {
+    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
+    uint32_t next_times = 0;
+
+    for (uint32_t j = 0; j < kRunTimes; j++) {
+      // Function Probe.
+      start_cycles = __rdtsc();
+      auto scan_structure = hash_table.SIMDProbe(keys, kNumKeys, sel_vector);
+      // hash_table.Probe(keys, kNumKeys, sel_vector);
+      end_cycles = __rdtsc();
+      probe_cycles += end_cycles - start_cycles;
+
+      // Function Next.
+      start_cycles = __rdtsc();
+      while (scan_structure.HasNext()) {
+        scan_structure.SIMDNext(keys, input, output);
+        next_times++;
+      }
+      end_cycles = __rdtsc();
+      next_cycles += end_cycles - start_cycles;
+    }
+    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
+    std::cout << "Next: " << next_cycles_per_tuple << "\n";
+    std::cout << "#chunks: " << next_times << "\n";
+  }
 
   std::cout << "--------------- Scalar with two loops ---------------\n";
   {
@@ -156,6 +217,4 @@ int main(int argc, char *argv[]) {
     double cycles_per_tuple = static_cast<double>(total_cycles) / static_cast<double>(kNumKeys * kRunTimes);
     std::cout << "Probe: " << cycles_per_tuple << "\n";
   }
-
-  std::cout << "--------------- Hash Table ----------------\n";
 }

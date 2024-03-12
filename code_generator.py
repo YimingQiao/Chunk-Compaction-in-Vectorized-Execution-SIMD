@@ -46,6 +46,6 @@ if __name__ == '__main__':
 
     for i in range(8):
         print(f'''
-        int64_t key{i} = keys[sel_vector[i + {i}]];
-        loaded_keys[i + {i}] = key{i};
+            uint64_t bucket_idx{i} = hash_(loaded_keys[i + {i}]) & SCALAR_BUCKET_MASK;
+    ptrs[i + {i}] = linked_lists_[bucket_idx{i}].get();
 ''')
