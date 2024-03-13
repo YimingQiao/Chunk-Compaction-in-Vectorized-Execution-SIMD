@@ -12,7 +12,7 @@
 #include "profiler.h"
 #include "negative_feedback.hpp"
 
-namespace compaction {
+namespace simd_compaction {
 class NaiveCompactor {
  public:
   explicit NaiveCompactor(const vector<AttributeType> &types)

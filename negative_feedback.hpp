@@ -14,7 +14,7 @@
 
 #include "base.h"
 
-namespace compaction {
+namespace simd_compaction {
 
 // I use UCB1 (https://cse442-17f.github.io/LinUCB/) to select the best
 class MultiArmedBandit {

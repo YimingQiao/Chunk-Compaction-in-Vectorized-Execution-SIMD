@@ -1,6 +1,6 @@
 #include "compactor.h"
 
-namespace compaction {
+namespace simd_compaction {
 void NaiveCompactor::Compact(unique_ptr<DataChunk> &chunk) {
   if (chunk->count_ == kBlockSize) return;
 

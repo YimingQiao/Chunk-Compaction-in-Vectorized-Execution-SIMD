@@ -10,7 +10,7 @@
 #pragma once
 
 // This file contains all parameters used in the project
-namespace compaction {
+namespace simd_compaction {
 
 // query setting
 size_t kJoins = 3;

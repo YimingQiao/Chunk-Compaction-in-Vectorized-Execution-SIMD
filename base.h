@@ -20,11 +20,10 @@
 
 namespace simd_compaction {
 
-const uint64_t kNumKeys = 204800;
-const uint64_t kRHSTuples = 512000;
-const uint64_t kRunTimes = 32;
-const uint64_t kLanes = 8;
-const uint64_t kChunkFactor = 1;
+uint64_t kNumKeys = 20480;
+uint64_t kRHSTuples = 5120;
+uint64_t kRunTimes = 32;
+uint64_t kLanes = 8;
 
 const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
 const static __m512i ALL_ONE = _mm512_set1_epi64(1);
@@ -37,6 +36,7 @@ using std::string;
 using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
+using idx_t = size_t;
 
 constexpr size_t kBlockSize = 204800;
 
