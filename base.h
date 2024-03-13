@@ -10,20 +10,25 @@
 #pragma once
 
 #include <cassert>
+#include <immintrin.h>
 #include <iostream>
 #include <list>
 #include <memory>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-#include <immintrin.h>
 
 namespace simd_compaction {
 
-const uint64_t kNumKeys = 2048;
-const uint64_t kNumBuckets = 1024;
-const uint64_t kRunTimes = 65536;
+const uint64_t kNumKeys = 204800;
+const uint64_t kRHSTuples = 512000;
+const uint64_t kRunTimes = 32;
 const uint64_t kLanes = 8;
+const uint64_t kChunkFactor = 1;
+
+const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
+const static __m512i ALL_ONE = _mm512_set1_epi64(1);
+const static __m512i ALL_EIGHT = _mm512_set1_epi64(8);
 
 // Some data structures
 using std::list;
@@ -33,15 +38,12 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-constexpr size_t kBlockSize = 2048;
+constexpr size_t kBlockSize = 204800;
 
 // Attribute includes three types: integer, float-point number, and the string.
 using Attribute = int64_t;
 
-enum class AttributeType : uint8_t {
-  INTEGER = 0,
-  INVALID = 3
-};
+enum class AttributeType : uint8_t { INTEGER = 0, INVALID = 3 };
 
 // The vector uses Row ID.
 class Vector {
@@ -56,13 +58,9 @@ class Vector {
 
   inline void Reference(Vector &other);
 
-  Attribute &GetValue(size_t idx) {
-    return (*data_)[idx];
-  }
+  Attribute &GetValue(size_t idx) { return (*data_)[idx]; }
 
-  Attribute &operator[](size_t idx) {
-    return (*data_)[idx];
-  }
+  Attribute &operator[](size_t idx) { return (*data_)[idx]; }
 };
 
 // A data chunk has some columns.

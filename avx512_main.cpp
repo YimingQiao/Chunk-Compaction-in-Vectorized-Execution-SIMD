@@ -45,7 +45,7 @@ int main(int argc, char *argv[]) {
     const uint64_t kLanes = 8;
     uint64_t start_cycles, end_cycles, gather_cycles = 0, hash_cycles = 0;
 
-    __m512i BUCKET_MASK = _mm512_set1_epi64(kNumBuckets - 1);
+    __m512i BUCKET_MASK = _mm512_set1_epi64(kRHSTuples - 1);
     for (uint32_t j = 0; j < kRunTimes; j++) {
 
       start_cycles = __rdtsc();
@@ -342,7 +342,7 @@ int main(int argc, char *argv[]) {
 
     start_cycles = __rdtsc();
 
-    __m512i BUCKET_MASK = _mm512_set1_epi64(kNumBuckets - 1);
+    __m512i BUCKET_MASK = _mm512_set1_epi64(kRHSTuples - 1);
     for (uint32_t j = 0; j < kRunTimes; j++) {
       int64_t *keys_data = keys.data_->data();
       for (uint64_t i = 0; i < kNumKeys; i += kLanes * 64) {

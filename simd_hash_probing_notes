@@ -16,7 +16,7 @@ for (uint64_t i = 0; i < kNumKeys; i ++) {
 // Hash
 for (uint64_t i = 0; i < kNumKeys; i ++) {
     uint64 key = gathered_keys[i];
-    buckets[i] = HashFunction(key) & (kNumBuckets - 1);
+    buckets[i] = HashFunction(key) & (kRHSTuples - 1);
 }
 
 Scalar w/o -march=native (cycle per key)                Gather: 0.506101	Hash: 1.86269	Probe: 2.36879
@@ -33,7 +33,7 @@ SIMD (cycle per key)                                    Gather: 0.398755	Hash: 0
 // Gather and Hash
 for (uint64_t i = 0; i < kNumKeys; i ++) {
     uint64 key = keys[sel_vector[i]];
-    buckets[i] = HashFunction(key) & (kNumBuckets - 1);
+    buckets[i] = HashFunction(key) & (kRHSTuples - 1);
 }
 
 Scalar w/o -march=native (cycle per key)                Gather: ---       Hash: ---       Probe: 1.78797

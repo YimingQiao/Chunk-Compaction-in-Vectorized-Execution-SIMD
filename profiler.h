@@ -52,9 +52,7 @@ class BaseProfiler {
   }
 
  private:
-  time_point<T> Tick() const {
-    return T::now();
-  }
+  time_point<T> Tick() const { return T::now(); }
   time_point<T> start;
   time_point<T> end;
   bool finished = false;
@@ -72,9 +70,7 @@ class BeeProfiler {
     return instance;
   }
 
-  void InsertStatRecord(string name, double value) {
-    InsertStatRecord(name, size_t(value * 1e9));
-  }
+  void InsertStatRecord(string name, double value) { InsertStatRecord(name, size_t(value * 1e9)); }
 
   inline void InsertStatRecord(string name, size_t value) {
     if (kEnableProfiling) {
@@ -87,9 +83,7 @@ class BeeProfiler {
   void InsertHTRecord(string name, size_t tuple_sz, size_t point_table_sz, size_t num_terms) {
     if (kEnableProfiling) {
       std::lock_guard<std::mutex> lock(mtx);
-      if (ht_records_.count(name) == 0) {
-        ht_records_[name] = HTInfo(tuple_sz, point_table_sz, num_terms);
-      }
+      if (ht_records_.count(name) == 0) { ht_records_[name] = HTInfo(tuple_sz, point_table_sz, num_terms); }
     }
   }
 
@@ -105,25 +99,18 @@ class BeeProfiler {
 
     // -------------------------------- Print Timing Results --------------------------------
     std::vector<std::string> keys;
-    for (const auto &pair : values_) {
-      keys.push_back(pair.first);
-    }
+    for (const auto &pair : values_) { keys.push_back(pair.first); }
     if (!keys.empty()) {
       std::sort(keys.begin(), keys.end());
       std::cerr << "-------\n";
       for (const auto &key : keys) {
-        if (key.find("TableScan") != std::string::npos && key.find("in_mem") == std::string::npos) {
-          continue;
-        }
-        if (key.find("#Tuple") != std::string::npos) {
-          continue;
-        }
+        if (key.find("TableScan") != std::string::npos && key.find("in_mem") == std::string::npos) { continue; }
+        if (key.find("#Tuple") != std::string::npos) { continue; }
         double time = values_.at(key) / double(1e9);
         size_t calling_times = calling_times_.at(key);
         double avg = time / calling_times;
 
-        std::cerr << "Total: " << time << " s\tCalls: " << calling_times << "\tAvg: " << avg << " s\t" << key
-                  << '\n';
+        std::cerr << "Total: " << time << " s\tCalls: " << calling_times << "\tAvg: " << avg << " s\t" << key << '\n';
       }
       std::cerr << "-------\n";
       for (const auto &key : keys) {
@@ -132,17 +119,15 @@ class BeeProfiler {
           size_t calling_times = calling_times_.at(key);
           double avg = total_tuples / double(calling_times);
 
-          std::cerr << "Total: " << total_tuples << "\tCalls: " << calling_times << "\tAvg: " << avg << "\t"
-                    << key << '\n';
+          std::cerr << "Total: " << total_tuples << "\tCalls: " << calling_times << "\tAvg: " << avg << "\t" << key
+                    << '\n';
         }
       }
     }
 
     // -------------------------------- Print HT Results --------------------------------
     std::vector<string> ht_keys;
-    for (const auto &pair : ht_records_) {
-      ht_keys.push_back(pair.first);
-    }
+    for (const auto &pair : ht_records_) { ht_keys.push_back(pair.first); }
     if (!ht_keys.empty()) {
       std::cerr << "-------\n";
       std::sort(ht_keys.begin(), ht_keys.end());
@@ -170,8 +155,7 @@ class BeeProfiler {
     size_t point_table_size;
     size_t num_terms;
 
-    HTInfo(size_t ts = 0, size_t pts = 0, size_t nt = 0) : tuple_size(ts), point_table_size(pts), num_terms(nt) {
-    }
+    HTInfo(size_t ts = 0, size_t pts = 0, size_t nt = 0) : tuple_size(ts), point_table_size(pts), num_terms(nt) {}
   };
 
   unordered_map<string, size_t> values_;
@@ -220,8 +204,7 @@ class ZebraProfiler {
         std::cerr << name << '\n';
         for (size_t i = 1; i <= kBlockSize; ++i) {
           if (hist.cnt_[i] > 0) {
-            std::cerr << i << ": " << hist.values_[i] / double(1e3) / hist.cnt_[i] << " us\t"
-                      << hist.cnt_[i] << '\n';
+            std::cerr << i << ": " << hist.values_[i] / double(1e3) / hist.cnt_[i] << " us\t" << hist.cnt_[i] << '\n';
           }
         }
       }
@@ -238,9 +221,7 @@ class ZebraProfiler {
         const auto &hist = pair.second;
 
         // filter these filters
-        if (name.find("FILTER") != string::npos) {
-          continue;
-        }
+        if (name.find("FILTER") != string::npos) { continue; }
 
         string file_name = folder_name + "/" + name + ".csv";
         std::ofstream out(file_name);
@@ -254,24 +235,18 @@ class ZebraProfiler {
     }
   }
 
-  inline void Clear() {
-    hists_.clear();
-  }
+  inline void Clear() { hists_.clear(); }
 
  private:
-  ZebraProfiler() : gen_(rd()) {
-  }
+  ZebraProfiler() : gen_(rd()) {}
 
-  inline size_t RandomInteger() {
-    return integers(gen_);
-  }
+  inline size_t RandomInteger() { return integers(gen_); }
 
   struct Histogram {
     vector<atomic<size_t>> values_;// in ns
     vector<atomic<size_t>> cnt_;
 
-    Histogram() : values_(kBlockSize + 1), cnt_(kBlockSize + 1) {
-    }
+    Histogram() : values_(kBlockSize + 1), cnt_(kBlockSize + 1) {}
   };
 
   mutex mutex_;

@@ -5,8 +5,8 @@
 #include "base.h"
 #include "compactor.h"
 #include "data_collection.h"
+#include "hash_table.h"
 #include "profiler.h"
-#include "scalar_hash_table.h"
 #include "setting.h"
 
 using namespace compaction;
