@@ -214,9 +214,6 @@ void ParseParameters(int argc, char **argv) {
         }
       }
     }
-
-    if (kJoins != kRHSPayLoadLength.size())
-      throw std::runtime_error("Payload vector length must equal to the number of joins.");
   }
 
   // show the setting
