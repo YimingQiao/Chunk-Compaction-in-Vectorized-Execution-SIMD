@@ -24,7 +24,7 @@ static uint64_t kLanes = 8;
 static size_t kJoins = 3;
 static size_t kLHSTupleSize = 2e7;
 static size_t kRHSTupleSize = 2e6;
-static size_t kChunkFactor = 1;
+static size_t kChunkFactor = 4;
 static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
 
 // compaction setting

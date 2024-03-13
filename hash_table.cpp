@@ -202,16 +202,6 @@ void ScanStructure::SIMDAdvancePointers() {
     __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
     auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
     auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
-    // Memory format of list::iterators
-    //      struct ListNode {
-    //        ListNode *next;
-    //        ListNode *prev;
-    //        T* data;
-    //      };
-    //
-    //      struct ListIterator {
-    //        ListNode<T> currentNode;
-    //      };
     auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
     _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
     __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
