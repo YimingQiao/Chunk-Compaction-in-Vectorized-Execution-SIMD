@@ -4,6 +4,7 @@
 #include <vector>
 
 #include "base.h"
+#include "setting.h"
 #include "hash_functions.h"
 
 using namespace simd_compaction;

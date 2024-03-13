@@ -43,7 +43,7 @@ int main(int argc, char *argv[]) {
   // this code is to be tested.
   std::cout << "--------------- SIMD HashJoin ---------------\n";
   {
-    HashTable hash_table(kRHSTuples, 1);
+    HashTable hash_table(kRHSTuples, kChunkFactor);
     DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
     input.data_[0] = keys;
     input.count_ = kNumKeys;
@@ -84,7 +84,7 @@ int main(int argc, char *argv[]) {
   // this code is to be tested.
   std::cout << "--------------- Scalar HashJoin ---------------\n";
   {
-    HashTable hash_table(kRHSTuples, 1);
+    HashTable hash_table(kRHSTuples, kChunkFactor);
     DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
     input.data_[0] = keys;
     input.count_ = kNumKeys;

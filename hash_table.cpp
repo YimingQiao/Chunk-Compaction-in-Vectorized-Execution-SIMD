@@ -3,7 +3,7 @@
 namespace simd_compaction {
 HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
     : loaded_keys(kBlockSize), bucket_ids(kBlockSize), ptrs(kBlockSize), ptrs_sel_vector(kBlockSize),
-      bucket_offset(kBlockSize, 0), bucket_sizes(kBlockSize), result_vector(kBlockSize) {
+      result_vector(kBlockSize) {
   // number of buckets should be the minimum exp number of 2.
   n_buckets_ = 1;
   while (n_buckets_ < 2 * n_rhs_tuples) n_buckets_ *= 2;
@@ -11,7 +11,7 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
   SCALAR_BUCKET_MASK = n_buckets_ - 1;
   BUCKET_MASK = _mm512_set1_epi64(n_buckets_ - 1);
   linked_lists_.resize(n_buckets_);
-  for (auto &bucket : linked_lists_) bucket = std::make_unique<vector<Tuple>>();
+  for (auto &bucket : linked_lists_) bucket = std::make_unique<list<Tuple>>();
 
   // Tuple in Hash Table
   vector<Tuple> rhs_table(n_rhs_tuples);
@@ -37,8 +37,9 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
     bucket->push_back(tuple);
   }
 
+  // get list ends.
   list_sizes_.resize(n_buckets_);
-  for (size_t i = 0; i < n_buckets_; ++i) { list_sizes_[i] = linked_lists_[i]->size(); }
+  for (size_t i = 0; i < n_buckets_; ++i) list_sizes_[i] = linked_lists_[i]->size();
 }
 
 void HashTable::Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector) {
@@ -52,12 +53,8 @@ void HashTable::Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vect
   for (size_t i = 0; i < count; i++) {
     int64_t key = join_key[sel_vector[i]];
     uint64_t hash = murmurhash64(key);
-    // uint64_t hash = key;
     ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
-    if (!ptrs[i]->empty()) {
-      ptrs_sel_vector[n_valid++] = i;
-      bucket_sizes[i] = ptrs[i]->size();
-    }
+    if (!ptrs[i]->empty()) { ptrs_sel_vector[n_valid++] = i; }
   }
 
   //  double time = profiler.Elapsed();
@@ -73,17 +70,17 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
   // suppose count is the times of 8
   for (uint64_t i = 0; i < count; i += 8) {
     __m256i indices = _mm256_loadu_epi32(sel_vector.data() + i);
-    auto gathered_values = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
-    __m512i hashes = mm512_murmurhash64(gathered_values);
+    auto keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
+    __m512i hashes = mm512_murmurhash64(keys);
     __m512i bucket_indices = _mm512_and_si512(hashes, BUCKET_MASK);
-    auto gathered_buckets = _mm512_i64gather_epi64(bucket_indices, linked_lists_.data(), 8);
-    _mm512_storeu_epi64(ptrs.data() + i, gathered_buckets);
+    auto buckets = _mm512_i64gather_epi64(bucket_indices, linked_lists_.data(), 8);
+    _mm512_storeu_epi64(ptrs.data() + i, buckets);
 
+    // filter empty buckets
     auto sizes = _mm512_i64gather_epi64(bucket_indices, list_sizes_.data(), 8);
-    __mmask8 not_zero = _mm512_cmpneq_epi64_mask(sizes, ALL_ZERO);
-    _mm256_mask_compressstoreu_epi32(ptrs_sel_vector.data() + n_valid, not_zero, indices);
-    _mm512_storeu_epi64(bucket_sizes.data() + i, sizes);
-    n_valid += _mm_popcnt_u32(not_zero);
+    __mmask8 valids = _mm512_cmpneq_epi64_mask(sizes, ALL_ZERO);
+    _mm256_mask_compressstoreu_epi32(ptrs_sel_vector.data() + n_valid, valids, indices);
+    n_valid += _mm_popcnt_u32(valids);
   }
 }
 
@@ -133,8 +130,7 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
     for (size_t i = 0; i < count_; ++i) {
       size_t idx = bucket_sel_vector_[i];
       auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
-      uint32_t offset = offsets_[idx];
-      auto &r_key = (*buckets_[idx])[offset].attrs_[0];
+      auto &r_key = iterators_[idx]->attrs_[0];
       if (l_key == r_key) result_vector[result_count++] = idx;
     }
 
@@ -153,22 +149,20 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
     for (int32_t i = 0; i < count_ - tail; i += 8) {
       __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
       auto l_keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
-      auto buckets = _mm512_i32gather_epi64(indices, buckets_.data(), 8);
-      auto offsets = _mm512_i32gather_epi64(indices, offsets_.data(), 8);
-
-      // The following simd code is a little confusing, it is the same as:
-      // -----------------------------------------------------------------------
-      __m512i r_keys;
-      for (int j = 0; j < 8; j++) {
-        auto *bucket = reinterpret_cast<vector<Tuple> *>(buckets[j]);
-        r_keys[j] = (*bucket)[offsets[j]].attrs_[0];
-      }
-      // -----------------------------------------------------------------------
-      //      buckets = _mm512_i64gather_epi64(buckets, nullptr, 1);
-      //      buckets = _mm512_add_epi64(buckets, _mm512_slli_epi64(offsets, 3));
-      //      buckets = _mm512_i64gather_epi64(buckets, nullptr, 1);
-      //      auto r_keys = _mm512_i64gather_epi64(buckets, nullptr, 1);
-
+      auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
+      // Memory format of list::iterators
+      //      struct ListNode {
+      //        ListNode *next;
+      //        ListNode *prev;
+      //        T* data;
+      //      };
+      //
+      //      struct ListIterator {
+      //        ListNode<T> currentNode;
+      //      };
+      iterators = _mm512_add_epi64(iterators, _mm512_set1_epi64(16));
+      auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
+      auto r_keys = _mm512_i64gather_epi64(nodes, nullptr, 1);
       __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
       _mm256_mask_compressstoreu_epi32(result_vector_.data() + result_count, match, indices);
       result_count += _mm_popcnt_u32(match);
@@ -179,8 +173,7 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       for (int32_t i = index; i < count_; ++i) {
         size_t idx = bucket_sel_vector_[i];
         auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
-        uint32_t offset = offsets_[idx];
-        auto &r_key = (*buckets_[idx])[offset].attrs_[0];
+        auto &r_key = iterators_[idx]->attrs_[0];
         if (l_key == r_key) result_vector_[result_count++] = idx;
       }
     }
@@ -197,7 +190,7 @@ void ScanStructure::AdvancePointers() {
   size_t new_count = 0;
   for (size_t i = 0; i < count_; i++) {
     auto idx = bucket_sel_vector_[i];
-    if (++offsets_[idx] != buckets_[idx]->size()) { bucket_sel_vector_[new_count++] = idx; }
+    if (++iterators_[idx] != buckets_[idx]->end()) { bucket_sel_vector_[new_count++] = idx; }
   }
   count_ = new_count;
 }
@@ -207,20 +200,29 @@ void ScanStructure::SIMDAdvancePointers() {
   size_t new_count = 0;
   for (int32_t i = 0; i < count_ - tail; i += 8) {
     __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
-    auto offsets = _mm512_i32gather_epi64(indices, offsets_.data(), 8);
-    offsets = _mm512_add_epi64(offsets, ALL_ONE);
-    _mm512_i32scatter_epi64(offsets_.data(), indices, offsets, 8);
-    auto bucket_sizes = _mm512_i32gather_epi64(indices, bucket_sizes_.data(), 8);
-
-    __mmask8 match = _mm512_cmplt_epi64_mask(offsets, bucket_sizes);
-    _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, match, indices);
-    new_count += _mm_popcnt_u32(match);
+    auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
+    auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
+    // Memory format of list::iterators
+    //      struct ListNode {
+    //        ListNode *next;
+    //        ListNode *prev;
+    //        T* data;
+    //      };
+    //
+    //      struct ListIterator {
+    //        ListNode<T> currentNode;
+    //      };
+    auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
+    _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
+    __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
+    _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
+    new_count += _mm_popcnt_u32(valid);
   }
 
   if (tail) {
     for (size_t i = count_ - tail; i < count_; i++) {
       auto idx = bucket_sel_vector_[i];
-      if (++offsets_[idx] != buckets_[idx]->size()) { bucket_sel_vector_[new_count++] = idx; }
+      if (++iterators_[idx] != buckets_[idx]->end()) { bucket_sel_vector_[new_count++] = idx; }
     }
   }
 
@@ -231,8 +233,7 @@ void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_ve
                                  size_t count) {
   for (size_t i = 0; i < count; ++i) {
     auto idx = result_vector[i];
-    uint32_t offset = offsets_[idx];
-    auto &tuple = (*buckets_[idx])[offset];
+    auto &tuple = *iterators_[idx];
 
     // columns from the right table align with the selection vector given by the left table
     size_t pos = sel_vector[idx];
@@ -247,31 +248,15 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
                                      vector<uint32_t> &result_vector, int32_t count) {
   int32_t tail = count & 7;
   for (int32_t i = 0; i < count - tail; i += 8) {
-    __m256i ids = _mm256_loadu_epi32(result_vector.data() + i);
-    auto offsets = _mm512_i32gather_epi64(ids, offsets_.data(), 8);
-    auto buckets = _mm512_i32gather_epi64(ids, buckets_.data(), 8);
-    auto positions = _mm256_i32gather_epi32((int *) sel_vector.data(), ids, 4);
-
-    // The following simd code is a little confusing, it is the same as:
-    // -----------------------------------------------------------------------
-    //    __m512i keys;
-    //    for (int k = 0; k < 8; k++) {
-    //      auto *bucket = reinterpret_cast<vector<Tuple> *>(buckets[k]);
-    //
-    //      for (size_t j = 0; j < cols.size(); ++j) {
-    //        auto &col = *cols[j];
-    //        keys[k] = (*bucket)[offsets[k]].attrs_[j];
-    //        _mm512_i32scatter_epi64(col.data_->data(), positions, keys, 8);
-    //      }
-    //    }
-    // -----------------------------------------------------------------------
-    buckets = _mm512_i64gather_epi64(buckets, nullptr, 1);
-    buckets = _mm512_add_epi64(buckets, _mm512_mullo_epi64(offsets, ALL_EIGHT));
-    buckets = _mm512_i64gather_epi64(buckets, nullptr, 1);
+    __m256i indices = _mm256_loadu_epi32(result_vector.data() + i);
+    auto positions = _mm256_i32gather_epi32((int *) sel_vector.data(), indices, 4);
+    auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
+    iterators = _mm512_add_epi64(iterators, _mm512_set1_epi64(16));
+    auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
 
     for (size_t j = 0; j < cols.size(); ++j) {
       auto &col = *cols[j];
-      __m512i attribute = _mm512_add_epi64(buckets, _mm512_set1_epi64(8 * j));
+      __m512i attribute = _mm512_add_epi64(nodes, _mm512_set1_epi64(8 * j));
       auto keys = _mm512_i64gather_epi64(attribute, nullptr, 1);
       _mm512_i32scatter_epi64(col.data_->data(), positions, keys, 8);
     }
@@ -280,8 +265,7 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
   if (tail) {
     for (int32_t i = count - tail; i < count; ++i) {
       auto idx = result_vector[i];
-      uint32_t offset = offsets_[idx];
-      auto &tuple = (*buckets_[idx])[offset];
+      auto &tuple = *iterators_[idx];
       size_t pos = sel_vector[idx];
 
       for (size_t j = 0; j < cols.size(); ++j) {

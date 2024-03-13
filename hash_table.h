@@ -15,10 +15,10 @@
 #include <utility>
 
 #include "base.h"
-#include "setting.h"
 #include "gather_functions.h"
 #include "hash_functions.h"
 #include "profiler.h"
+#include "setting.h"
 
 namespace simd_compaction {
 
@@ -30,12 +30,17 @@ struct Tuple {
 
 class ScanStructure {
  public:
-  explicit ScanStructure(size_t count, vector<uint32_t> &bucket_sel_vector, vector<vector<Tuple> *> &buckets,
-                         vector<uint64_t> &bucket_sizes, vector<uint32_t> &key_format, vector<uint64_t> &offsets,
-                         HashTable *ht, vector<uint32_t> &result_vector)
-      : count_(count), buckets_(buckets), bucket_sizes_(bucket_sizes), bucket_sel_vector_(bucket_sel_vector),
-        key_sel_vector_(key_format), offsets_(offsets), ht_(ht), result_vector_(result_vector) {
-    std::fill(offsets.begin(), offsets.end(), 0);
+  explicit ScanStructure(size_t count, vector<uint32_t> &bucket_sel_vec, vector<list<Tuple> *> &buckets,
+                         vector<uint32_t> &key_sel_vec, HashTable *ht, vector<uint32_t> &result_vec)
+      : count_(count), buckets_(buckets), bucket_sel_vector_(bucket_sel_vec), key_sel_vector_(key_sel_vec), ht_(ht),
+        result_vector_(result_vec) {
+    iterators_.resize(kBlockSize);
+    iterators_end_.resize(kBlockSize);
+    for (size_t i = 0; i < count; ++i) {
+      size_t idx = bucket_sel_vector_[i];
+      iterators_[idx] = buckets_[idx]->begin();
+      iterators_end_[idx] = buckets_[idx]->end();
+    }
   }
 
   void Next(Vector &join_key, DataChunk &input, DataChunk &result);
@@ -46,11 +51,11 @@ class ScanStructure {
 
  private:
   int64_t count_;
-  vector<vector<Tuple> *> buckets_;
-  vector<uint64_t> bucket_sizes_;
+  vector<list<Tuple> *> buckets_;
   vector<uint32_t> bucket_sel_vector_;
   vector<uint32_t> &key_sel_vector_;
-  vector<uint64_t> &offsets_;
+  vector<list<Tuple>::iterator> iterators_;
+  vector<list<Tuple>::iterator> iterators_end_;
   HashTable *ht_;
   vector<uint32_t> result_vector_;
 
@@ -72,7 +77,7 @@ class ScanStructure {
 class HashTable {
  public:
   size_t n_buckets_;
-  vector<unique_ptr<vector<Tuple>>> linked_lists_;
+  vector<unique_ptr<list<Tuple>>> linked_lists_;
   vector<uint64_t> list_sizes_;
 
   HashTable(size_t n_rhs_tuples, size_t chunk_factor);
@@ -80,8 +85,7 @@ class HashTable {
   void Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
 
   ScanStructure GetScanStructure() {
-    return ScanStructure(n_valid, ptrs_sel_vector, ptrs, bucket_sizes, *ref_sel_vector, bucket_offset, this,
-                         result_vector);
+    return ScanStructure(n_valid, ptrs_sel_vector, ptrs, *ref_sel_vector, this, result_vector);
   }
 
   void SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
@@ -93,13 +97,11 @@ class HashTable {
   // helper vectors
   vector<int64_t> loaded_keys;
   vector<uint64_t> bucket_ids;
-  vector<uint64_t> bucket_offset;
-  vector<uint64_t> bucket_sizes;
-  vector<vector<Tuple> *> ptrs;
+  vector<list<Tuple> *> ptrs;
   vector<uint32_t> ptrs_sel_vector;
 
   uint32_t n_valid = 0;
-  vector<uint32_t> *ref_sel_vector{};
+  vector<uint32_t> *ref_sel_vector = nullptr;
   vector<uint32_t> result_vector;
 };
 }// namespace simd_compaction
