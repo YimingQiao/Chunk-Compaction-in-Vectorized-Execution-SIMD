@@ -43,3 +43,19 @@ SIMD (cycle per key)                                    Gather: ---       Hash: 
 
     Comment:
         1. We should not mix the gather and hash.
+
+
+---------------------- Chaining ----------------------
+L1 cache size: 48K
+L2 cache size: 32K
+L3 cache size: 2048K
+Join Key Size: 1600 KB
+Hash Table Size: 80 KB
+--------------- SIMD HashJoin ---------------
+Probe: 3.73736
+Next: 3.99146
+#chunks: 512
+--------------- Scalar HashJoin ---------------
+Probe: 14.0569
+Next: 5.41697
+#chunks: 512
