@@ -67,4 +67,4 @@ void DynamicCompactor::Compact(unique_ptr<DataChunk> &chunk) {
   BeeProfiler::Get().InsertStatRecord(name_, time);
   ZebraProfiler::Get().InsertRecord(name_, chunk->count_, time);
 }
-}
+}// namespace simd_compaction

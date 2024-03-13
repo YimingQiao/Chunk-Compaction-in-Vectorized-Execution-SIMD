@@ -36,7 +36,7 @@ target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
 add_executable(scalar_hash scalar_simd_main.cpp base.cpp hash_table.cpp)
 target_compile_options(scalar_hash PRIVATE -funroll-loops)
 
-add_executable(simd_compaction main.cpp base.cpp hash_table.cpp data_collection.cpp compactor.cpp hash_table.cpp)
+add_executable(simd_compaction main.cpp hash_table.cpp data_collection.cpp compactor.cpp base.cpp)
 target_compile_options(simd_compaction PRIVATE -march=native)
 
 

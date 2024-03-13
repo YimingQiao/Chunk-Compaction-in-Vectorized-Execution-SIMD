@@ -15,6 +15,7 @@
 #include <utility>
 
 #include "base.h"
+#include "setting.h"
 #include "gather_functions.h"
 #include "hash_functions.h"
 #include "profiler.h"

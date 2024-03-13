@@ -9,18 +9,25 @@
 
 #pragma once
 
+#include "compactor.h"
+
 // This file contains all parameters used in the project
+
 namespace simd_compaction {
 
+static uint64_t kNumKeys = 20480;
+static uint64_t kRHSTuples = 5120;
+static uint64_t kRunTimes = 32;
+static uint64_t kLanes = 8;
+
 // query setting
-size_t kJoins = 3;
-size_t kLHSTupleSize = 2e7;
-size_t kRHSTupleSize = 2e6;
-size_t kChunkFactor = 6;
-vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
+static size_t kJoins = 3;
+static size_t kLHSTupleSize = 2e7;
+static size_t kRHSTupleSize = 2e6;
+static size_t kChunkFactor = 6;
+static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
 
 // compaction setting
-
 #ifdef flag_full_compact
 using Compactor = NaiveCompactor;
 const string strategy_name = "full_compaction";
@@ -35,5 +42,5 @@ using Compactor = NaiveCompactor;
 const string strategy_name = "no_compaction";
 #endif
 
-bool flag_collect_tuples = false;
-}
+const bool flag_collect_tuples = false;
+}// namespace simd_compaction

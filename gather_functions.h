@@ -2,7 +2,7 @@
 
 #include <immintrin.h>
 
-#include "base.h"
+#include "setting.h"
 
 namespace simd_compaction {
 

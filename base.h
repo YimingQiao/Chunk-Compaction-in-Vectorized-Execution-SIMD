@@ -20,11 +20,6 @@
 
 namespace simd_compaction {
 
-uint64_t kNumKeys = 20480;
-uint64_t kRHSTuples = 5120;
-uint64_t kRunTimes = 32;
-uint64_t kLanes = 8;
-
 const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
 const static __m512i ALL_ONE = _mm512_set1_epi64(1);
 const static __m512i ALL_EIGHT = _mm512_set1_epi64(8);

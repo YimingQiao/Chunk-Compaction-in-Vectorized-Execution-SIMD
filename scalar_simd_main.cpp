@@ -7,6 +7,7 @@
 #include "hash_functions.h"
 #include "hash_table.h"
 #include "profiler.h"
+#include "setting.h"
 
 using namespace simd_compaction;
 
