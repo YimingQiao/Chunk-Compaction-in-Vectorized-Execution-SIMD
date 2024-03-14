@@ -30,148 +30,135 @@ void PrintCacheSizes() {
 int main(int argc, char *argv[]) {
   PrintCacheSizes();
 
-  Vector keys;
-  std::vector<uint32_t> sel_vector(kNumKeys);
-  for (uint64_t i = 0; i < kNumKeys; ++i) {
-    keys[i] = int64_t(i);
-    sel_vector[i] = i;
-  }
+  std::vector<int64_t> keys(kNumKeys);
+  for (uint64_t i = 0; i < kNumKeys; ++i) { keys[i] = int64_t(i); }
+  std::vector<uint32_t> sel_vector(kBlockSize);
+  for (uint32_t i = 0; i < kBlockSize; ++i) { sel_vector[i] = i; }
+  Vector keys_block;
 
   std::cout << "Join Key Size: " << 8 * kNumKeys / 1024 << " KB\n";
   std::cout << "Hash Table Size: " << 8 * kRHSTuples * 2 / 1024 << " KB\n";
 
   // this code is to be tested.
-  std::cout << "--------------- SIMD HashJoin ---------------\n";
-  {
-    HashTable hash_table(kRHSTuples, kChunkFactor);
-    DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
-    input.data_[0] = keys;
-    input.count_ = kNumKeys;
-    DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
-
-    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
-    uint32_t next_times = 0;
-
-    for (uint32_t j = 0; j < kRunTimes; j++) {
-      // Function Probe.
-      start_cycles = __rdtsc();
-
-      hash_table.SIMDProbe(keys, kNumKeys, sel_vector);
-
-      end_cycles = __rdtsc();
-      probe_cycles += end_cycles - start_cycles;
-
-      // Function Next.
-      auto scan_structure = hash_table.GetScanStructure();
-      while (scan_structure.HasNext()) {
-        start_cycles = __rdtsc();
-
-        scan_structure.SIMDNext(keys, input, output);
-
-        end_cycles = __rdtsc();
-        next_cycles += end_cycles - start_cycles;
-
-        next_times++;
-      }
-    }
-    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
-    std::cout << "Next: " << next_cycles_per_tuple << "\n";
-    std::cout << "#chunks: " << next_times << "\n";
-  }
-
-  // this code is to be tested.
-  std::cout << "--------------- Scalar HashJoin ---------------\n";
-  {
-    HashTable hash_table(kRHSTuples, kChunkFactor);
-    DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
-    input.data_[0] = keys;
-    input.count_ = kNumKeys;
-    DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
-
-    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
-    uint32_t next_times = 0;
-
-    for (uint32_t j = 0; j < kRunTimes; j++) {
-      // Function Probe.
-      start_cycles = __rdtsc();
-
-      hash_table.Probe(keys, kNumKeys, sel_vector);
-
-      end_cycles = __rdtsc();
-      probe_cycles += end_cycles - start_cycles;
-
-      // Function Next.
-      auto scan_structure = hash_table.GetScanStructure();
-      start_cycles = __rdtsc();
-      while (scan_structure.HasNext()) {
-        start_cycles = __rdtsc();
-
-        scan_structure.Next(keys, input, output);
-
-        end_cycles = __rdtsc();
-        next_cycles += end_cycles - start_cycles;
-
-        next_times++;
-      }
-    }
-    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
-    std::cout << "Next: " << next_cycles_per_tuple << "\n";
-    std::cout << "#chunks: " << next_times << "\n";
-  }
+  //  std::cout << "--------------- SIMD HashJoin ---------------\n";
+  //  {
+  //    HashTable hash_table(kRHSTuples, kChunkFactor);
+  //    DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
+  //    DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
+  //
+  //    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
+  //    uint32_t next_times = 0;
+  //
+  //    for (uint32_t j = 0; j < kRunTimes; j++) {
+  //      for (uint32_t k = 0; k < kNumKeys; k += kBlockSize) {
+  //        // Load one block
+  //        for (uint32_t i = 0; i < kBlockSize; ++i) {
+  //          keys_block[i] = keys[k + i];
+  //          input.data_[0] = keys_block;
+  //          input.count_ = kBlockSize;
+  //        }
+  //
+  //        // Function Probe.
+  //        start_cycles = __rdtsc();
+  //
+  //        hash_table.SIMDProbe(keys_block, kBlockSize, sel_vector);
+  //
+  //        end_cycles = __rdtsc();
+  //        probe_cycles += end_cycles - start_cycles;
+  //
+  //        // Function Next.
+  //        auto scan_structure = hash_table.GetScanStructure();
+  //        while (scan_structure.HasNext()) {
+  //          start_cycles = __rdtsc();
+  //
+  //          scan_structure.SIMDNext(keys_block, input, output);
+  //
+  //          end_cycles = __rdtsc();
+  //          next_cycles += end_cycles - start_cycles;
+  //
+  //          next_times++;
+  //        }
+  //      }
+  //    }
+  //    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+  //    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+  //    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
+  //    std::cout << "Next: " << next_cycles_per_tuple << "\n";
+  //    std::cout << "Total: " << probe_cycles_per_tuple + next_cycles_per_tuple << "\n";
+  //    std::cout << "#chunks: " << next_times << "\n";
+  //  }
+  //
+  //  std::cout << "--------------- Scalar HashJoin ---------------\n";
+  //  {
+  //    HashTable hash_table(kRHSTuples, kChunkFactor);
+  //    DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
+  //    DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
+  //
+  //    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
+  //    uint32_t next_times = 0;
+  //
+  //    for (uint32_t j = 0; j < kRunTimes; j++) {
+  //      for (uint32_t k = 0; k < kNumKeys; k += kBlockSize) {
+  //        // load one block
+  //        for (uint32_t i = 0; i < kBlockSize; ++i) {
+  //          keys_block[i] = keys[k + i];
+  //          input.data_[0] = keys_block;
+  //          input.count_ = kBlockSize;
+  //        }
+  //
+  //        // Function Probe.
+  //        start_cycles = __rdtsc();
+  //
+  //        hash_table.Probe(keys_block, kBlockSize, sel_vector);
+  //
+  //        end_cycles = __rdtsc();
+  //        probe_cycles += end_cycles - start_cycles;
+  //
+  //        // Function Next.
+  //        auto scan_structure = hash_table.GetScanStructure();
+  //        start_cycles = __rdtsc();
+  //        while (scan_structure.HasNext()) {
+  //          start_cycles = __rdtsc();
+  //
+  //          scan_structure.Next(keys_block, input, output);
+  //
+  //          end_cycles = __rdtsc();
+  //          next_cycles += end_cycles - start_cycles;
+  //
+  //          next_times++;
+  //        }
+  //      }
+  //    }
+  //    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+  //    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+  //    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
+  //    std::cout << "Next: " << next_cycles_per_tuple << "\n";
+  //    std::cout << "Total: " << probe_cycles_per_tuple + next_cycles_per_tuple << "\n";
+  //    std::cout << "#chunks: " << next_times << "\n";
+  //  }
 
   std::cout << "--------------- Scalar with two loops ---------------\n";
   {
     std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
     std::vector<int64_t> loaded_keys(kNumKeys, 0);
+    std::vector<uint32_t> sel_vector(kNumKeys, 0);
+    for (size_t i = 0; i < kNumKeys; i++) sel_vector[i] = i;
     uint64_t start_cycles, end_cycles, gather_cycles = 0, hash_cycles = 0;
+    uint64_t BUCKET_MASK = (kRHSTuples - 1);
 
     for (uint32_t j = 0; j < kRunTimes; j++) {
-
       start_cycles = __rdtsc();
 
-      loaded_keys = ScalarGather(*keys.data_, sel_vector, loaded_keys);
+      loaded_keys = ScalarGather(keys, sel_vector, loaded_keys);
 
       end_cycles = __rdtsc();
       gather_cycles += end_cycles - start_cycles;
       start_cycles = __rdtsc();
 
-      uint64_t BUCKET_MASK = (kRHSTuples - 1);
-      for (uint64_t i = 0; i < kNumKeys; i += 8) {
-        int64_t key0 = loaded_keys[i];
-        uint64_t hash0 = murmurhash64(key0);
-        scalar_buckets[i] = hash0 & BUCKET_MASK + j;
-
-        int64_t key1 = loaded_keys[i + 1];
-        uint64_t hash1 = murmurhash64(key1);
-        scalar_buckets[i + 1] = hash1 & BUCKET_MASK + j;
-
-        int64_t key2 = loaded_keys[i + 2];
-        uint64_t hash2 = murmurhash64(key2);
-        scalar_buckets[i + 2] = hash2 & BUCKET_MASK + j;
-
-        int64_t key3 = loaded_keys[i + 3];
-        uint64_t hash3 = murmurhash64(key3);
-        scalar_buckets[i + 3] = hash3 & BUCKET_MASK + j;
-
-        int64_t key4 = loaded_keys[i + 4];
-        uint64_t hash4 = murmurhash64(key4);
-        scalar_buckets[i + 4] = hash4 & BUCKET_MASK + j;
-
-        int64_t key5 = loaded_keys[i + 5];
-        uint64_t hash5 = murmurhash64(key5);
-        scalar_buckets[i + 5] = hash5 & BUCKET_MASK + j;
-
-        int64_t key6 = loaded_keys[i + 6];
-        uint64_t hash6 = murmurhash64(key6);
-        scalar_buckets[i + 6] = hash6 & BUCKET_MASK + j;
-
-        int64_t key7 = loaded_keys[i + 7];
-        uint64_t hash7 = murmurhash64(key7);
-        scalar_buckets[i + 7] = hash7 & BUCKET_MASK + j;
+      for (uint64_t i = 0; i < kNumKeys; i++) {
+        int64_t key = loaded_keys[i];
+        uint64_t hash = murmurhash64(key);
+        scalar_buckets[i] = hash & BUCKET_MASK;
       }
 
       end_cycles = __rdtsc();
@@ -188,50 +175,21 @@ int main(int argc, char *argv[]) {
   std::cout << "--------------- Scalar with one loop ---------------\n";
   {
     std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
-    uint64_t start_cycles, end_cycles;
-
-    start_cycles = __rdtsc();
+    std::vector<uint32_t> sel_vector(kNumKeys, 0);
+    for (size_t i = 0; i < kNumKeys; i++) sel_vector[i] = i;
+    uint64_t start_cycles, end_cycles, total_cycles = 0;
+    uint64_t BUCKET_MASK = (kRHSTuples - 1);
 
     for (uint32_t j = 0; j < kRunTimes; j++) {
-      uint64_t BUCKET_MASK = (kRHSTuples - 1);
-      for (uint64_t i = 0; i < kNumKeys; i += 8) {
-        int64_t key0 = keys[sel_vector[i + 0]];
-        uint64_t hash0 = murmurhash64(key0);
-        scalar_buckets[i + 0] = hash0 & BUCKET_MASK + j;
-
-        int64_t key1 = keys[sel_vector[i + 1]];
-        uint64_t hash1 = murmurhash64(key1);
-        scalar_buckets[i + 1] = hash1 & BUCKET_MASK + j;
-
-        int64_t key2 = keys[sel_vector[i + 2]];
-        uint64_t hash2 = murmurhash64(key2);
-        scalar_buckets[i + 2] = hash2 & BUCKET_MASK + j;
-
-        int64_t key3 = keys[sel_vector[i + 3]];
-        uint64_t hash3 = murmurhash64(key3);
-        scalar_buckets[i + 3] = hash3 & BUCKET_MASK + j;
-
-        int64_t key4 = keys[sel_vector[i + 4]];
-        uint64_t hash4 = murmurhash64(key4);
-        scalar_buckets[i + 4] = hash4 & BUCKET_MASK + j;
-
-        int64_t key5 = keys[sel_vector[i + 5]];
-        uint64_t hash5 = murmurhash64(key5);
-        scalar_buckets[i + 5] = hash5 & BUCKET_MASK + j;
-
-        int64_t key6 = keys[sel_vector[i + 6]];
-        uint64_t hash6 = murmurhash64(key6);
-        scalar_buckets[i + 6] = hash6 & BUCKET_MASK + j;
-
-        int64_t key7 = keys[sel_vector[i + 7]];
-        uint64_t hash7 = murmurhash64(key7);
-        scalar_buckets[i + 7] = hash7 & BUCKET_MASK + j;
+      start_cycles = __rdtsc();
+      for (uint64_t i = 0; i < kNumKeys; i++) {
+        int64_t key = keys[sel_vector[i]];
+        uint64_t hash = murmurhash64(key);
+        scalar_buckets[i] = hash & BUCKET_MASK;
       }
+      end_cycles = __rdtsc();
+      total_cycles += end_cycles - start_cycles;
     }
-
-    end_cycles = __rdtsc();
-
-    uint64_t total_cycles = end_cycles - start_cycles;
     double cycles_per_tuple = static_cast<double>(total_cycles) / static_cast<double>(kNumKeys * kRunTimes);
     std::cout << "Probe: " << cycles_per_tuple << "\n";
   }

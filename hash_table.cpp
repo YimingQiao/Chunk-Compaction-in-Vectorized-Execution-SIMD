@@ -67,8 +67,8 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
   n_valid = 0;
   ref_sel_vector = &sel_vector;
 
-  // suppose count is the times of 8
-  for (uint64_t i = 0; i < count; i += 8) {
+  int32_t tail = count & 7;
+  for (uint64_t i = 0; i < count - tail; i += 8) {
     __m256i indices = _mm256_loadu_epi32(sel_vector.data() + i);
     auto keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
     __m512i hashes = mm512_murmurhash64(keys);
@@ -82,19 +82,23 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
     _mm256_mask_compressstoreu_epi32(ptrs_sel_vector.data() + n_valid, valids, indices);
     n_valid += _mm_popcnt_u32(valids);
   }
+
+  if (tail) {
+    for (size_t i = count - tail; i < count; i++) {
+      int64_t key = join_key[sel_vector[i]];
+      uint64_t hash = murmurhash64(key);
+      ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
+      if (!ptrs[i]->empty()) { ptrs_sel_vector[n_valid++] = i; }
+    }
+  }
 }
 
 void ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) {
-  if (count_ == 0) {
-    // no pointers left to chase
-    return;
-  }
+  if (count_ == 0) return;
 
   size_t result_count = ScanInnerJoin(join_key, result_vector_);
 
   if (result_count > 0) {
-    // matches were found
-    // construct the result
     // on the LHS, we create a slice using the result vector
     result.Slice(input, result_vector_, result_count);
 
@@ -201,9 +205,19 @@ void ScanStructure::SIMDAdvancePointers() {
   for (int32_t i = 0; i < count_ - tail; i += 8) {
     __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
     auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
-    auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
+    // Memory format of list::iterators
+    //      struct ListNode {
+    //        ListNode *next;
+    //        ListNode *prev;
+    //        T* data;
+    //      };
+    //
+    //      struct ListIterator {
+    //        ListNode<T> currentNode;
+    //      };
     auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
     _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
+    auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
     __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
     _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
     new_count += _mm_popcnt_u32(valid);
