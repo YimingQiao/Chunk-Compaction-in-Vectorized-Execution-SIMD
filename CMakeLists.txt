@@ -34,7 +34,7 @@ target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
 
 # Scalar code, w/o -march=native
 add_executable(scalar_hash scalar_simd_main.cpp base.cpp hash_table.cpp)
-target_compile_options(scalar_hash PRIVATE -funroll-loops)
+target_compile_options(scalar_hash PRIVATE -funroll-loops -mavx512f -mavx512dq -mavx512vl)
 
 add_executable(simd_compaction main.cpp hash_table.cpp data_collection.cpp compactor.cpp base.cpp)
 target_compile_options(simd_compaction PRIVATE -march=native)

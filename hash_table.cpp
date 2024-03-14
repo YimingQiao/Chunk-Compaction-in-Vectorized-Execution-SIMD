@@ -42,10 +42,7 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
   for (size_t i = 0; i < n_buckets_; ++i) list_sizes_[i] = linked_lists_[i]->size();
 }
 
-void HashTable::Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector) {
-  //  Profiler profiler;
-  //  profiler.Start();
-
+void HashTable::Probe(simd_compaction::Vector &join_key, size_t count, vector<uint32_t> &sel_vector) {
   n_valid = 0;
   ref_sel_vector = &sel_vector;
 
@@ -54,13 +51,7 @@ void HashTable::Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vect
     int64_t key = join_key[sel_vector[i]];
     uint64_t hash = murmurhash64(key);
     ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
-    if (!ptrs[i]->empty()) { ptrs_sel_vector[n_valid++] = i; }
   }
-
-  //  double time = profiler.Elapsed();
-  //  BeeProfiler::Get().InsertStatRecord("[Join - Probe] 0x" + std::to_string(size_t(this)), time);
-  //  ZebraProfiler::Get().InsertRecord("[Join - Probe] 0x" + std::to_string(size_t(this)), count, time);
-  // return ret;
 }
 
 void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector) {
@@ -75,12 +66,6 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
     __m512i bucket_indices = _mm512_and_si512(hashes, BUCKET_MASK);
     auto buckets = _mm512_i64gather_epi64(bucket_indices, linked_lists_.data(), 8);
     _mm512_storeu_epi64(ptrs.data() + i, buckets);
-
-    // filter empty buckets
-    auto sizes = _mm512_i64gather_epi64(bucket_indices, list_sizes_.data(), 8);
-    __mmask8 valids = _mm512_cmpneq_epi64_mask(sizes, ALL_ZERO);
-    _mm256_mask_compressstoreu_epi32(ptrs_sel_vector.data() + n_valid, valids, indices);
-    n_valid += _mm_popcnt_u32(valids);
   }
 
   if (tail) {
@@ -88,14 +73,11 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
       int64_t key = join_key[sel_vector[i]];
       uint64_t hash = murmurhash64(key);
       ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
-      if (!ptrs[i]->empty()) { ptrs_sel_vector[n_valid++] = i; }
     }
   }
 }
 
 void ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) {
-  if (count_ == 0) return;
-
   size_t result_count = ScanInnerJoin(join_key, result_vector_);
 
   if (result_count > 0) {
@@ -133,7 +115,7 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
     size_t result_count = 0;
     for (size_t i = 0; i < count_; ++i) {
       size_t idx = bucket_sel_vector_[i];
-      auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
+      auto &l_key = join_key[key_sel_vector_[idx]];
       auto &r_key = iterators_[idx]->attrs_[0];
       if (l_key == r_key) result_vector[result_count++] = idx;
     }
@@ -194,7 +176,7 @@ void ScanStructure::AdvancePointers() {
   size_t new_count = 0;
   for (size_t i = 0; i < count_; i++) {
     auto idx = bucket_sel_vector_[i];
-    if (++iterators_[idx] != buckets_[idx]->end()) { bucket_sel_vector_[new_count++] = idx; }
+    if (++iterators_[idx] != iterators_end_[idx]) { bucket_sel_vector_[new_count++] = idx; }
   }
   count_ = new_count;
 }

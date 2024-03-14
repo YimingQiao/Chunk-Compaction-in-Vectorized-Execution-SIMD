@@ -3,10 +3,7 @@
 #include <vector>
 
 #include "base.h"
-#include "gather_functions.h"
-#include "hash_functions.h"
 #include "hash_table.h"
-#include "profiler.h"
 #include "setting.h"
 
 using namespace simd_compaction;
@@ -137,60 +134,60 @@ int main(int argc, char *argv[]) {
     std::cout << "#chunks: " << next_times << "\n";
   }
 
-//  std::cout << "--------------- Scalar with two loops ---------------\n";
-//  {
-//    std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
-//    std::vector<int64_t> loaded_keys(kNumKeys, 0);
-//    std::vector<uint32_t> sel_vector(kNumKeys, 0);
-//    for (size_t i = 0; i < kNumKeys; i++) sel_vector[i] = i;
-//    uint64_t start_cycles, end_cycles, gather_cycles = 0, hash_cycles = 0;
-//    uint64_t BUCKET_MASK = (kRHSTuples - 1);
-//
-//    for (uint32_t j = 0; j < kRunTimes; j++) {
-//      start_cycles = __rdtsc();
-//
-//      loaded_keys = ScalarGather(keys, sel_vector, loaded_keys);
-//
-//      end_cycles = __rdtsc();
-//      gather_cycles += end_cycles - start_cycles;
-//      start_cycles = __rdtsc();
-//
-//      for (uint64_t i = 0; i < kNumKeys; i++) {
-//        int64_t key = loaded_keys[i];
-//        uint64_t hash = murmurhash64(key);
-//        scalar_buckets[i] = hash & BUCKET_MASK;
-//      }
-//
-//      end_cycles = __rdtsc();
-//      hash_cycles += end_cycles - start_cycles;
-//    }
-//
-//    double gather_cycles_per_tuple = static_cast<double>(gather_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-//    double hash_cycles_per_tuple = static_cast<double>(hash_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-//    std::cout << "Gather: " << gather_cycles_per_tuple << "\t";
-//    std::cout << "Hash: " << hash_cycles_per_tuple << "\t";
-//    std::cout << "Probe: " << gather_cycles_per_tuple + hash_cycles_per_tuple << "\n";
-//  }
-//
-//  std::cout << "--------------- Scalar with one loop ---------------\n";
-//  {
-//    std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
-//    std::vector<uint32_t> sel_vector(kNumKeys, 0);
-//    for (size_t i = 0; i < kNumKeys; i++) sel_vector[i] = i;
-//    uint64_t start_cycles, end_cycles, total_cycles = 0;
-//    uint64_t BUCKET_MASK = (kRHSTuples - 1);
-//
-//    for (uint32_t j = 0; j < kRunTimes; j++) {
-//      start_cycles = __rdtsc();
-//      for (uint64_t i = 0; i < kNumKeys; i++) {
-//        int64_t key = keys[sel_vector[i]];
-//        uint64_t hash = murmurhash64(key);
-//        scalar_buckets[i] = hash & BUCKET_MASK;
-//      }
-//      end_cycles = __rdtsc();
-//      total_cycles += end_cycles - start_cycles;
-//    }
-//    double cycles_per_tuple = static_cast<double>(total_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-//    std::cout << "Probe: " << cycles_per_tuple << "\n";
-//  }
+  std::cout << "--------------- Scalar with two loops ---------------\n";
+  {
+    std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
+    std::vector<int64_t> loaded_keys(kNumKeys, 0);
+    std::vector<uint32_t> sel_vector(kNumKeys, 0);
+    for (size_t i = 0; i < kNumKeys; i++) sel_vector[i] = i;
+    uint64_t start_cycles, end_cycles, gather_cycles = 0, hash_cycles = 0;
+    uint64_t BUCKET_MASK = (kRHSTuples - 1);
+
+    for (uint32_t j = 0; j < kRunTimes; j++) {
+      start_cycles = __rdtsc();
+
+      loaded_keys = ScalarGather(keys, sel_vector, loaded_keys);
+
+      end_cycles = __rdtsc();
+      gather_cycles += end_cycles - start_cycles;
+      start_cycles = __rdtsc();
+
+      for (uint64_t i = 0; i < kNumKeys; i++) {
+        int64_t key = loaded_keys[i];
+        uint64_t hash = murmurhash64(key);
+        scalar_buckets[i] = hash & BUCKET_MASK;
+      }
+
+      end_cycles = __rdtsc();
+      hash_cycles += end_cycles - start_cycles;
+    }
+
+    double gather_cycles_per_tuple = static_cast<double>(gather_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double hash_cycles_per_tuple = static_cast<double>(hash_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    std::cout << "Gather: " << gather_cycles_per_tuple << "\t";
+    std::cout << "Hash: " << hash_cycles_per_tuple << "\t";
+    std::cout << "Probe: " << gather_cycles_per_tuple + hash_cycles_per_tuple << "\n";
+  }
+
+  std::cout << "--------------- Scalar with one loop ---------------\n";
+  {
+    std::vector<uint64_t> scalar_buckets(kNumKeys, 0);
+    std::vector<uint32_t> sel_vector(kNumKeys, 0);
+    for (size_t i = 0; i < kNumKeys; i++) sel_vector[i] = i;
+    uint64_t start_cycles, end_cycles, total_cycles = 0;
+    uint64_t BUCKET_MASK = (kRHSTuples - 1);
+
+    for (uint32_t j = 0; j < kRunTimes; j++) {
+      start_cycles = __rdtsc();
+      for (uint64_t i = 0; i < kNumKeys; i++) {
+        int64_t key = keys[sel_vector[i]];
+        uint64_t hash = murmurhash64(key);
+        scalar_buckets[i] = hash & BUCKET_MASK;
+      }
+      end_cycles = __rdtsc();
+      total_cycles += end_cycles - start_cycles;
+    }
+    double cycles_per_tuple = static_cast<double>(total_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    std::cout << "Probe: " << cycles_per_tuple << "\n";
+  }
 }

@@ -30,16 +30,18 @@ struct Tuple {
 
 class ScanStructure {
  public:
-  explicit ScanStructure(size_t count, vector<uint32_t> &bucket_sel_vec, vector<list<Tuple> *> &buckets,
-                         vector<uint32_t> &key_sel_vec, HashTable *ht, vector<uint32_t> &result_vec)
-      : count_(count), buckets_(buckets), bucket_sel_vector_(bucket_sel_vec), key_sel_vector_(key_sel_vec), ht_(ht),
-        result_vector_(result_vec) {
+  explicit ScanStructure(vector<list<Tuple> *> &buckets, vector<uint32_t> &key_sel_vec, HashTable *ht,
+                         vector<uint32_t> &result_vec)
+      : count_(0), buckets_(buckets), key_sel_vector_(key_sel_vec), ht_(ht), result_vector_(result_vec) {
+    bucket_sel_vector_.resize(kBlockSize);
     iterators_.resize(kBlockSize);
     iterators_end_.resize(kBlockSize);
-    for (size_t i = 0; i < count; ++i) {
-      size_t idx = bucket_sel_vector_[i];
-      iterators_[idx] = buckets_[idx]->begin();
-      iterators_end_[idx] = buckets_[idx]->end();
+    for (size_t i = 0; i < kBlockSize; ++i) {
+      if (buckets_[i] && !buckets_[i]->empty()) {
+        bucket_sel_vector_[count_++] = i;
+        iterators_[i] = buckets_[i]->begin();
+        iterators_end_[i] = buckets_[i]->end();
+      }
     }
   }
 
@@ -84,9 +86,7 @@ class HashTable {
 
   void Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
 
-  ScanStructure GetScanStructure() {
-    return ScanStructure(n_valid, ptrs_sel_vector, ptrs, *ref_sel_vector, this, result_vector);
-  }
+  ScanStructure GetScanStructure() { return ScanStructure(ptrs, *ref_sel_vector, this, result_vector); }
 
   void SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
 
