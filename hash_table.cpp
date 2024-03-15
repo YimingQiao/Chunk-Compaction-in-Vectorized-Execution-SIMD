@@ -128,29 +128,39 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
   }
 }
 
+// Memory format of list::iterators
+//      struct ListNode {
+//        ListNode *next;
+//        ListNode *prev;
+//        T* data;
+//      };
+//
+//      struct ListIterator {
+//        ListNode<T> currentNode;
+//      };
 size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector) {
   while (true) {
     size_t result_count = 0;
-    int64_t tail = count_ & 7;
-    for (int32_t i = 0; i < count_ - tail; i += 8) {
-      __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
-      auto l_keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
-      auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
-      // Memory format of list::iterators
-      //      struct ListNode {
-      //        ListNode *next;
-      //        ListNode *prev;
-      //        T* data;
-      //      };
-      //
-      //      struct ListIterator {
-      //        ListNode<T> currentNode;
-      //      };
+    int64_t tail = count_ & 15;
+    for (int32_t i = 0; i < count_ - tail; i += 16) {
+      __m512i indices = _mm512_loadu_epi32(bucket_sel_vector_.data() + i);
+      auto high_indices = _mm512_castsi512_si256(indices);
+      auto l_keys = _mm512_i32gather_epi64(high_indices, join_key.data_->data(), 8);
+      auto iterators = _mm512_i32gather_epi64(high_indices, iterators_.data(), 8);
       iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
       auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
       auto r_keys = _mm512_i64gather_epi64(nodes, nullptr, 1);
-      __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
-      _mm256_mask_compressstoreu_epi32(result_vector_.data() + result_count, match, indices);
+      __mmask16 match = ((__mmask16) _mm512_cmpeq_epi64_mask(l_keys, r_keys)) << 8;
+
+      auto low_indices = _mm512_extracti64x4_epi64(indices, 1);
+      auto l_keys1 = _mm512_i32gather_epi64(low_indices, join_key.data_->data(), 8);
+      auto iterators1 = _mm512_i32gather_epi64(low_indices, iterators_.data(), 8);
+      iterators1 = _mm512_add_epi64(iterators1, ALL_SIXTEEN);
+      auto nodes1 = _mm512_i64gather_epi64(iterators1, nullptr, 1);
+      auto r_keys1 = _mm512_i64gather_epi64(nodes1, nullptr, 1);
+      match = match | _mm512_cmpeq_epi64_mask(l_keys1, r_keys1);
+
+      _mm512_mask_compressstoreu_epi32(result_vector_.data() + result_count, match, indices);
       result_count += _mm_popcnt_u32(match);
     }
 

@@ -34,7 +34,7 @@ using std::unordered_map;
 using std::vector;
 using idx_t = size_t;
 
-constexpr size_t kBlockSize = 32;
+constexpr size_t kBlockSize = 1024;
 
 // Attribute includes three types: integer, float-point number, and the string.
 using Attribute = int64_t;

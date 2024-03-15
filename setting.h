@@ -15,10 +15,10 @@
 
 namespace simd_compaction {
 
-static uint64_t scale = 0;
+static uint64_t scale = 12;
 static uint64_t kNumKeys = 2048 << scale;
 static uint64_t kRHSTuples = 1024 << scale;
-static uint64_t kRunTimes =(1 << 24) / kNumKeys;
+static uint64_t kRunTimes = std::max(1, int((1 << 23) / kNumKeys));
 static uint64_t kLanes = 8;
 
 // query setting
