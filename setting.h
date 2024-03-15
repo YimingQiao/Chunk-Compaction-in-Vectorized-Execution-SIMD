@@ -16,9 +16,9 @@
 namespace simd_compaction {
 
 static uint64_t scale = 0;
-static uint64_t kNumKeys = 2048 * 8;
-static uint64_t kRHSTuples = 2048 * 4;
-static uint64_t kRunTimes = 128;
+static uint64_t kNumKeys = 512;
+static uint64_t kRHSTuples = 512;
+static uint64_t kRunTimes = 16800;
 static uint64_t kLanes = 8;
 
 // query setting

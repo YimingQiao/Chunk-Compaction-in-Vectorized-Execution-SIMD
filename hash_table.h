@@ -100,7 +100,6 @@ class HashTable {
   vector<list<Tuple> *> ptrs;
   vector<uint32_t> ptrs_sel_vector;
 
-  uint32_t n_valid = 0;
   vector<uint32_t> *ref_sel_vector = nullptr;
   vector<uint32_t> result_vector;
 };

@@ -43,7 +43,6 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
 }
 
 void HashTable::Probe(simd_compaction::Vector &join_key, size_t count, vector<uint32_t> &sel_vector) {
-  n_valid = 0;
   ref_sel_vector = &sel_vector;
 
   // gather, hash and find buckets
@@ -55,7 +54,6 @@ void HashTable::Probe(simd_compaction::Vector &join_key, size_t count, vector<ui
 }
 
 void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector) {
-  n_valid = 0;
   ref_sel_vector = &sel_vector;
 
   int32_t tail = count & 7;
@@ -117,7 +115,11 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
       size_t idx = bucket_sel_vector_[i];
       auto &l_key = join_key[key_sel_vector_[idx]];
       auto &r_key = iterators_[idx]->attrs_[0];
-      if (l_key == r_key) result_vector[result_count++] = idx;
+
+      // remove branch prediction: it saves ~4 cycles.
+      // if (l_key == r_key) result_vector[result_count++] = idx;
+      result_vector[result_count] = idx;
+      result_count += (l_key == r_key);
     }
 
     if (result_count > 0) return result_count;
@@ -154,13 +156,15 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       result_count += _mm_popcnt_u32(match);
     }
 
-    if (tail != 0) {
+    if (tail) {
       int32_t index = count_ - tail;
       for (int32_t i = index; i < count_; ++i) {
         size_t idx = bucket_sel_vector_[i];
         auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
         auto &r_key = iterators_[idx]->attrs_[0];
-        if (l_key == r_key) result_vector_[result_count++] = idx;
+
+        result_vector[result_count] = idx;
+        result_count += (l_key == r_key);
       }
     }
 
@@ -176,7 +180,11 @@ void ScanStructure::AdvancePointers() {
   size_t new_count = 0;
   for (size_t i = 0; i < count_; i++) {
     auto idx = bucket_sel_vector_[i];
-    if (++iterators_[idx] != iterators_end_[idx]) { bucket_sel_vector_[new_count++] = idx; }
+    ++iterators_[idx];
+
+    // remove branch prediction.
+    bucket_sel_vector_[new_count] = idx;
+    new_count += (iterators_[idx] != iterators_end_[idx]);
   }
   count_ = new_count;
 }
@@ -199,6 +207,7 @@ void ScanStructure::SIMDAdvancePointers() {
     //      };
     auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
     _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
+
     auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
     __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
     _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
@@ -208,7 +217,11 @@ void ScanStructure::SIMDAdvancePointers() {
   if (tail) {
     for (size_t i = count_ - tail; i < count_; i++) {
       auto idx = bucket_sel_vector_[i];
-      if (++iterators_[idx] != buckets_[idx]->end()) { bucket_sel_vector_[new_count++] = idx; }
+      ++iterators_[idx];
+
+      // remove branch prediction.
+      bucket_sel_vector_[new_count] = idx;
+      new_count += (iterators_[idx] != iterators_end_[idx]);
     }
   }
 
