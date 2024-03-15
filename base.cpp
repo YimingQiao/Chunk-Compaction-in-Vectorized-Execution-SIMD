@@ -51,19 +51,17 @@ void DataChunk::SIMDSlice(DataChunk &other, vector<uint32_t> &selection_vector, 
   this->count_ = count;
   for (size_t c = 0; c < other.data_.size(); ++c) data_[c].Reference(other.data_[c]);
 
-  int32_t tail = count & 15;
-  for (int32_t i = 0; i < count - tail; i += 16) {
-    __m512i new_ids = _mm512_loadu_epi32(selection_vector.data() + i);
-    __m512i key_ids = _mm512_i32gather_epi32(new_ids, other.selection_vector_.data(), 4);
-    _mm512_storeu_epi32(selection_vector_.data() + i, key_ids);
+  int32_t tail = count & 7;
+  for (int32_t i = 0; i < count - tail; i += 8) {
+    __m256i new_ids = _mm256_loadu_epi32(selection_vector.data() + i);
+    __m256i key_ids = _mm256_i32gather_epi32((int *) other.selection_vector_.data(), new_ids, 4);
+    _mm256_storeu_epi32(selection_vector_.data() + i, key_ids);
   }
 
-  if (tail) {
-    for (int32_t i = count - tail; i < count; ++i) {
-      auto new_idx = selection_vector[i];
-      auto key_idx = other.selection_vector_[new_idx];
-      selection_vector_[i] = key_idx;
-    }
+  for (int32_t i = count - tail; i < count; ++i) {
+    auto new_idx = selection_vector[i];
+    auto key_idx = other.selection_vector_[new_idx];
+    selection_vector_[i] = key_idx;
   }
 }
 }// namespace simd_compaction

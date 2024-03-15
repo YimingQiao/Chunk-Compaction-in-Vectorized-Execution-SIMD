@@ -66,12 +66,10 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
     _mm512_storeu_epi64(ptrs.data() + i, buckets);
   }
 
-  if (tail) {
-    for (size_t i = count - tail; i < count; i++) {
-      int64_t key = join_key[sel_vector[i]];
-      uint64_t hash = murmurhash64(key);
-      ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
-    }
+  for (size_t i = count - tail; i < count; i++) {
+    int64_t key = join_key[sel_vector[i]];
+    uint64_t hash = murmurhash64(key);
+    ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
   }
 }
 
@@ -115,11 +113,7 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
       size_t idx = bucket_sel_vector_[i];
       auto &l_key = join_key[key_sel_vector_[idx]];
       auto &r_key = iterators_[idx]->attrs_[0];
-
-      // remove branch prediction: it saves ~4 cycles.
-      // if (l_key == r_key) result_vector[result_count++] = idx;
-      result_vector[result_count] = idx;
-      result_count += (l_key == r_key);
+      if (l_key == r_key) result_vector[result_count++] = idx;
     }
 
     if (result_count > 0) return result_count;
@@ -156,16 +150,11 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       result_count += _mm_popcnt_u32(match);
     }
 
-    if (tail) {
-      int32_t index = count_ - tail;
-      for (int32_t i = index; i < count_; ++i) {
-        size_t idx = bucket_sel_vector_[i];
-        auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
-        auto &r_key = iterators_[idx]->attrs_[0];
-
-        result_vector[result_count] = idx;
-        result_count += (l_key == r_key);
-      }
+    for (int32_t i = count_ - tail; i < count_; ++i) {
+      size_t idx = bucket_sel_vector_[i];
+      auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
+      auto &r_key = iterators_[idx]->attrs_[0];
+      if (l_key == r_key) result_vector[result_count++] = idx;
     }
 
     if (result_count > 0) return result_count;
@@ -180,11 +169,7 @@ void ScanStructure::AdvancePointers() {
   size_t new_count = 0;
   for (size_t i = 0; i < count_; i++) {
     auto idx = bucket_sel_vector_[i];
-    ++iterators_[idx];
-
-    // remove branch prediction.
-    bucket_sel_vector_[new_count] = idx;
-    new_count += (iterators_[idx] != iterators_end_[idx]);
+    if (++iterators_[idx] != buckets_[idx]->end()) bucket_sel_vector_[new_count++] = idx;
   }
   count_ = new_count;
 }
@@ -214,15 +199,9 @@ void ScanStructure::SIMDAdvancePointers() {
     new_count += _mm_popcnt_u32(valid);
   }
 
-  if (tail) {
-    for (size_t i = count_ - tail; i < count_; i++) {
-      auto idx = bucket_sel_vector_[i];
-      ++iterators_[idx];
-
-      // remove branch prediction.
-      bucket_sel_vector_[new_count] = idx;
-      new_count += (iterators_[idx] != iterators_end_[idx]);
-    }
+  for (size_t i = count_ - tail; i < count_; i++) {
+    auto idx = bucket_sel_vector_[i];
+    if (++iterators_[idx] != buckets_[idx]->end()) bucket_sel_vector_[new_count++] = idx;
   }
 
   count_ = new_count;
@@ -261,16 +240,14 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
     }
   }
 
-  if (tail) {
-    for (int32_t i = count - tail; i < count; ++i) {
-      auto idx = result_vector[i];
-      auto &tuple = *iterators_[idx];
-      size_t pos = sel_vector[idx];
+  for (int32_t i = count - tail; i < count; ++i) {
+    auto idx = result_vector[i];
+    auto &tuple = *iterators_[idx];
+    size_t pos = sel_vector[idx];
 
-      for (size_t j = 0; j < cols.size(); ++j) {
-        auto &col = *cols[j];
-        col.GetValue(pos) = tuple.attrs_[j];
-      }
+    for (size_t j = 0; j < cols.size(); ++j) {
+      auto &col = *cols[j];
+      col.GetValue(pos) = tuple.attrs_[j];
     }
   }
 }
