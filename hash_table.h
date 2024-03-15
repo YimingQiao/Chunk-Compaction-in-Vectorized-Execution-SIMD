@@ -45,9 +45,9 @@ class ScanStructure {
     }
   }
 
-  void Next(Vector &join_key, DataChunk &input, DataChunk &result);
+  uint32_t Next(Vector &join_key, DataChunk &input, DataChunk &result);
 
-  void SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result);
+  uint32_t SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result);
 
   bool HasNext() const { return count_ > 0; }
 

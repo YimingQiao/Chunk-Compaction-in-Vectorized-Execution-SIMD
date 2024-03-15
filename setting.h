@@ -15,17 +15,17 @@
 
 namespace simd_compaction {
 
-static uint64_t scale = 1;
-static uint64_t kNumKeys = 1024 * (1 << scale);
-static uint64_t kRHSTuples = 32 * (1 << scale);
-static uint64_t kRunTimes = 256;
+static uint64_t scale = 0;
+static uint64_t kNumKeys = 2048 << scale;
+static uint64_t kRHSTuples = 1024 << scale;
+static uint64_t kRunTimes =(1 << 24) / kNumKeys;
 static uint64_t kLanes = 8;
 
 // query setting
 static size_t kJoins = 3;
 static size_t kLHSTupleSize = 2e7;
 static size_t kRHSTupleSize = 2e6;
-static size_t kChunkFactor = 1;
+static size_t kChunkFactor = 2;
 static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
 
 // compaction setting

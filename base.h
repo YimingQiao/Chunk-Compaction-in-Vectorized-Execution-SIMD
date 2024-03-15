@@ -23,6 +23,7 @@ namespace simd_compaction {
 const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
 const static __m512i ALL_ONE = _mm512_set1_epi64(1);
 const static __m512i ALL_EIGHT = _mm512_set1_epi64(8);
+const static __m512i ALL_SIXTEEN = _mm512_set1_epi64(16);
 
 // Some data structures
 using std::list;

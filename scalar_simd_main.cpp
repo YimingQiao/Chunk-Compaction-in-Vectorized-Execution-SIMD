@@ -28,13 +28,13 @@ int main(int argc, char *argv[]) {
   PrintCacheSizes();
 
   std::vector<int64_t> keys(kNumKeys);
-  for (uint64_t i = 0; i < kNumKeys; ++i) { keys[i] = int64_t(i); }
+  for (uint64_t i = 0; i < kNumKeys; ++i) { keys[i] = int64_t(i) & (kRHSTuples - 1); }
   std::vector<uint32_t> sel_vector(kBlockSize);
   for (uint32_t i = 0; i < kBlockSize; ++i) { sel_vector[i] = i; }
   Vector keys_block;
 
-  std::cout << "Join Key Size: " << 8 * kNumKeys / 1024 << " KB\n";
-  std::cout << "Hash Table Size: " << 8 * kRHSTuples * 2 / 1024 << " KB\n";
+  std::cout << "LHS Table Size: " << 8 * kNumKeys / 1024 << " KB\n";
+  std::cout << "RHS Table Size: " << 8 * kRHSTuples * 2 / 1024 << " KB\n";
 
   // this code is to be tested.
   std::cout << "--------------- SIMD HashJoin ---------------\n";
@@ -44,9 +44,9 @@ int main(int argc, char *argv[]) {
     DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
 
     uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
-    uint32_t next_times = 0;
+    uint64_t cnt_tuple = 0;
 
-    for (uint32_t j = 0; j < kRunTimes; j++) {
+    for (uint64_t j = 0; j < kRunTimes; j++) {
       for (uint32_t k = 0; k < kNumKeys; k += kBlockSize) {
         // Load one block
         for (uint32_t i = 0; i < kBlockSize; ++i) {
@@ -68,21 +68,19 @@ int main(int argc, char *argv[]) {
         while (scan_structure.HasNext()) {
           start_cycles = __rdtsc();
 
-          scan_structure.SIMDNext(keys_block, input, output);
+          cnt_tuple += scan_structure.SIMDNext(keys_block, input, output);
 
           end_cycles = __rdtsc();
           next_cycles += end_cycles - start_cycles;
-
-          next_times++;
         }
       }
     }
-    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(cnt_tuple);
+    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(cnt_tuple);
     std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
     std::cout << "Next: " << next_cycles_per_tuple << "\n";
     std::cout << "Total: " << probe_cycles_per_tuple + next_cycles_per_tuple << "\n";
-    std::cout << "#chunks: " << next_times << "\n";
+    std::cout << "#tuples: " << cnt_tuple << "\n";
   }
 
   std::cout << "--------------- Scalar HashJoin ---------------\n";
@@ -92,7 +90,7 @@ int main(int argc, char *argv[]) {
     DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
 
     uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
-    uint32_t next_times = 0;
+    uint32_t cnt_tuples = 0;
 
     for (uint32_t j = 0; j < kRunTimes; j++) {
       for (uint32_t k = 0; k < kNumKeys; k += kBlockSize) {
@@ -117,21 +115,19 @@ int main(int argc, char *argv[]) {
         while (scan_structure.HasNext()) {
           start_cycles = __rdtsc();
 
-          scan_structure.Next(keys_block, input, output);
+          cnt_tuples += scan_structure.Next(keys_block, input, output);
 
           end_cycles = __rdtsc();
           next_cycles += end_cycles - start_cycles;
-
-          next_times++;
         }
       }
     }
-    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(cnt_tuples);
+    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(cnt_tuples);
     std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
     std::cout << "Next: " << next_cycles_per_tuple << "\n";
     std::cout << "Total: " << probe_cycles_per_tuple + next_cycles_per_tuple << "\n";
-    std::cout << "#chunks: " << next_times << "\n";
+    std::cout << "#tuples: " << cnt_tuples << "\n";
   }
 
   std::cout << "--------------- Scalar with two loops ---------------\n";

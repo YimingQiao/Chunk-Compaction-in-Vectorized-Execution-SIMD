@@ -73,7 +73,7 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
   }
 }
 
-void ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) {
+uint32_t ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) {
   size_t result_count = ScanInnerJoin(join_key, result_vector_);
 
   if (result_count > 0) {
@@ -85,10 +85,12 @@ void ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) 
     GatherResult(cols, input.selection_vector_, result_vector_, result_count);
   }
   AdvancePointers();
+
+  return result_count;
 }
 
-void ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result) {
-  if (count_ == 0) return;
+uint32_t ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result) {
+  if (count_ == 0) return 0;
 
   size_t result_count = SIMDScanInnerJoin(join_key, result_vector_);
 
@@ -103,6 +105,8 @@ void ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &resu
     SIMDGatherResult(cols, input.selection_vector_, result_vector_, result_count);
   }
   SIMDAdvancePointers();
+
+  return result_count;
 }
 
 size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector) {
@@ -142,7 +146,7 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       //      struct ListIterator {
       //        ListNode<T> currentNode;
       //      };
-      iterators = _mm512_add_epi64(iterators, _mm512_set1_epi64(16));
+      iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
       auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
       auto r_keys = _mm512_i64gather_epi64(nodes, nullptr, 1);
       __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
