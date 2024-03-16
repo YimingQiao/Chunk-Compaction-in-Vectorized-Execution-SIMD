@@ -31,11 +31,10 @@ struct Tuple {
 class ScanStructure {
  public:
   explicit ScanStructure(vector<list<Tuple> *> &buckets, vector<uint32_t> &key_sel_vec, HashTable *ht,
-                         vector<uint32_t> &result_vec)
-      : count_(0), buckets_(buckets), key_sel_vector_(key_sel_vec), ht_(ht), result_vector_(result_vec) {
-    bucket_sel_vector_.resize(kBlockSize);
-    iterators_.resize(kBlockSize);
-    iterators_end_.resize(kBlockSize);
+                         vector<uint32_t> &result_vec, vector<uint32_t> &bucket_sel_vector,
+                         vector<list<Tuple>::iterator> &iterators, vector<list<Tuple>::iterator> &iterators_end)
+      : count_(0), buckets_(buckets), key_sel_vector_(key_sel_vec), ht_(ht), result_vector_(result_vec),
+        bucket_sel_vector_(bucket_sel_vector), iterators_(iterators), iterators_end_(iterators_end) {
     for (size_t i = 0; i < kBlockSize; ++i) {
       if (buckets_[i] && !buckets_[i]->empty()) {
         bucket_sel_vector_[count_++] = i;
@@ -54,10 +53,10 @@ class ScanStructure {
  private:
   int64_t count_;
   vector<list<Tuple> *> buckets_;
-  vector<uint32_t> bucket_sel_vector_;
-  vector<uint32_t> &key_sel_vector_;
-  vector<list<Tuple>::iterator> iterators_;
-  vector<list<Tuple>::iterator> iterators_end_;
+  vector<uint32_t> &bucket_sel_vector_;
+  vector<uint32_t> key_sel_vector_;
+  vector<list<Tuple>::iterator> &iterators_;
+  vector<list<Tuple>::iterator> &iterators_end_;
   HashTable *ht_;
   vector<uint32_t> result_vector_;
 
@@ -86,7 +85,11 @@ class HashTable {
 
   void Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
 
-  ScanStructure GetScanStructure() { return ScanStructure(ptrs, *ref_sel_vector, this, result_vector); }
+  ScanStructure GetScanStructure() {
+    for (size_t i = 0; i < kBlockSize; ++i) ptrs[i] = linked_lists_[bucket_ids[i]].get();
+
+    return ScanStructure(ptrs, *ref_sel_vector, this, result_vector, bucket_sel_vector_, iterators_, iterators_end_);
+  }
 
   void SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vector);
 
@@ -99,6 +102,9 @@ class HashTable {
   vector<uint64_t> bucket_ids;
   vector<list<Tuple> *> ptrs;
   vector<uint32_t> ptrs_sel_vector;
+  vector<uint32_t> bucket_sel_vector_;
+  vector<list<Tuple>::iterator> iterators_;
+  vector<list<Tuple>::iterator> iterators_end_;
 
   vector<uint32_t> *ref_sel_vector = nullptr;
   vector<uint32_t> result_vector;

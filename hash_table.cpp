@@ -3,7 +3,7 @@
 namespace simd_compaction {
 HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
     : loaded_keys(kBlockSize), bucket_ids(kBlockSize), ptrs(kBlockSize), ptrs_sel_vector(kBlockSize),
-      result_vector(kBlockSize) {
+      result_vector(kBlockSize), bucket_sel_vector_(kBlockSize), iterators_(kBlockSize), iterators_end_(kBlockSize) {
   // number of buckets should be the minimum exp number of 2.
   n_buckets_ = 1;
   while (n_buckets_ < 2 * n_rhs_tuples) n_buckets_ *= 2;
@@ -48,8 +48,7 @@ void HashTable::Probe(simd_compaction::Vector &join_key, size_t count, vector<ui
   // gather, hash and find buckets
   for (size_t i = 0; i < count; i++) {
     int64_t key = join_key[sel_vector[i]];
-    uint64_t hash = murmurhash64(key);
-    ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
+    bucket_ids[i] = murmurhash64(key) & SCALAR_BUCKET_MASK;
   }
 }
 
@@ -62,14 +61,12 @@ void HashTable::SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_
     auto keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
     __m512i hashes = mm512_murmurhash64(keys);
     __m512i bucket_indices = _mm512_and_si512(hashes, BUCKET_MASK);
-    auto buckets = _mm512_i64gather_epi64(bucket_indices, linked_lists_.data(), 8);
-    _mm512_storeu_epi64(ptrs.data() + i, buckets);
+    _mm512_storeu_epi64(bucket_ids.data() + i, bucket_indices);
   }
 
   for (size_t i = count - tail; i < count; i++) {
     int64_t key = join_key[sel_vector[i]];
-    uint64_t hash = murmurhash64(key);
-    ptrs[i] = linked_lists_[hash & SCALAR_BUCKET_MASK].get();
+    bucket_ids[i] = murmurhash64(key) & SCALAR_BUCKET_MASK;
   }
 }
 
@@ -90,8 +87,6 @@ uint32_t ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &resu
 }
 
 uint32_t ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result) {
-  if (count_ == 0) return 0;
-
   size_t result_count = SIMDScanInnerJoin(join_key, result_vector_);
 
   if (result_count > 0) {
@@ -110,22 +105,16 @@ uint32_t ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
 }
 
 size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector) {
-  while (true) {
-    // Match
-    size_t result_count = 0;
-    for (size_t i = 0; i < count_; ++i) {
-      size_t idx = bucket_sel_vector_[i];
-      auto &l_key = join_key[key_sel_vector_[idx]];
-      auto &r_key = iterators_[idx]->attrs_[0];
-      if (l_key == r_key) result_vector[result_count++] = idx;
-    }
-
-    if (result_count > 0) return result_count;
-
-    // no matches found: check the next set of pointers
-    AdvancePointers();
-    if (count_ == 0) return 0;
+  // Match
+  size_t result_count = 0;
+  for (size_t i = 0; i < count_; ++i) {
+    size_t idx = bucket_sel_vector_[i];
+    auto &l_key = join_key[key_sel_vector_[idx]];
+    auto &r_key = iterators_[idx]->attrs_[0];
+    if (l_key == r_key) result_vector[result_count++] = idx;
   }
+
+  return result_count;
 }
 
 // Memory format of list::iterators
@@ -139,44 +128,49 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
 //        ListNode<T> currentNode;
 //      };
 size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector) {
-  while (true) {
-    size_t result_count = 0;
-    int64_t tail = count_ & 15;
-    for (int32_t i = 0; i < count_ - tail; i += 16) {
-      __m512i indices = _mm512_loadu_epi32(bucket_sel_vector_.data() + i);
-      auto high_indices = _mm512_castsi512_si256(indices);
-      auto l_keys = _mm512_i32gather_epi64(high_indices, join_key.data_->data(), 8);
-      auto iterators = _mm512_i32gather_epi64(high_indices, iterators_.data(), 8);
-      iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
-      auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
-      auto r_keys = _mm512_i64gather_epi64(nodes, nullptr, 1);
-      __mmask16 match = ((__mmask16) _mm512_cmpeq_epi64_mask(l_keys, r_keys)) << 8;
+  size_t result_count = 0;
+  int64_t tail = count_ & 15;
+  for (int32_t i = 0; i < count_ - tail; i += 16) {
+    //    auto indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
+    //    auto l_keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
+    //    auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
+    //    iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
+    //    auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
+    //    auto r_keys = _mm512_i64gather_epi64(nodes, nullptr, 1);
+    //    __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
+    //
+    //    _mm256_mask_compressstoreu_epi32(result_vector_.data() + result_count, match, indices);
+    //    result_count += _mm_popcnt_u32(match);
 
-      auto low_indices = _mm512_extracti64x4_epi64(indices, 1);
-      auto l_keys1 = _mm512_i32gather_epi64(low_indices, join_key.data_->data(), 8);
-      auto iterators1 = _mm512_i32gather_epi64(low_indices, iterators_.data(), 8);
-      iterators1 = _mm512_add_epi64(iterators1, ALL_SIXTEEN);
-      auto nodes1 = _mm512_i64gather_epi64(iterators1, nullptr, 1);
-      auto r_keys1 = _mm512_i64gather_epi64(nodes1, nullptr, 1);
-      match = match | _mm512_cmpeq_epi64_mask(l_keys1, r_keys1);
+    __m512i indices = _mm512_loadu_epi32(bucket_sel_vector_.data() + i);
+    auto high_indices = _mm512_extracti32x8_epi32(indices, 1);
+    auto l_keys = _mm512_i32gather_epi64(high_indices, join_key.data_->data(), 8);
+    auto iterators = _mm512_i32gather_epi64(high_indices, iterators_.data(), 8);
+    iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
+    auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
+    auto r_keys = _mm512_i64gather_epi64(nodes, nullptr, 1);
+    __mmask16 match = ((__mmask16) _mm512_cmpeq_epi64_mask(l_keys, r_keys)) << 8;
 
-      _mm512_mask_compressstoreu_epi32(result_vector_.data() + result_count, match, indices);
-      result_count += _mm_popcnt_u32(match);
-    }
+    auto low_indices = _mm512_extracti32x8_epi32(indices, 0);
+    auto l_keys1 = _mm512_i32gather_epi64(low_indices, join_key.data_->data(), 8);
+    auto iterators1 = _mm512_i32gather_epi64(low_indices, iterators_.data(), 8);
+    iterators1 = _mm512_add_epi64(iterators1, ALL_SIXTEEN);
+    auto nodes1 = _mm512_i64gather_epi64(iterators1, nullptr, 1);
+    auto r_keys1 = _mm512_i64gather_epi64(nodes1, nullptr, 1);
+    match = match | _mm512_cmpeq_epi64_mask(l_keys1, r_keys1);
 
-    for (int32_t i = count_ - tail; i < count_; ++i) {
-      size_t idx = bucket_sel_vector_[i];
-      auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
-      auto &r_key = iterators_[idx]->attrs_[0];
-      if (l_key == r_key) result_vector[result_count++] = idx;
-    }
-
-    if (result_count > 0) return result_count;
-
-    // no matches found: check the next set of pointers
-    SIMDAdvancePointers();
-    if (count_ == 0) return 0;
+    _mm512_mask_compressstoreu_epi32(result_vector_.data() + result_count, match, indices);
+    result_count += _mm_popcnt_u32(match);
   }
+
+  for (int32_t i = count_ - tail; i < count_; ++i) {
+    size_t idx = bucket_sel_vector_[i];
+    auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
+    auto &r_key = iterators_[idx]->attrs_[0];
+    if (l_key == r_key) result_vector[result_count++] = idx;
+  }
+
+  return result_count;
 }
 
 void ScanStructure::AdvancePointers() {
@@ -189,27 +183,36 @@ void ScanStructure::AdvancePointers() {
 }
 
 void ScanStructure::SIMDAdvancePointers() {
-  int32_t tail = count_ & 7;
+  int32_t tail = count_ & 15;
   size_t new_count = 0;
-  for (int32_t i = 0; i < count_ - tail; i += 8) {
-    __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
-    auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
-    // Memory format of list::iterators
-    //      struct ListNode {
-    //        ListNode *next;
-    //        ListNode *prev;
-    //        T* data;
-    //      };
+  for (int32_t i = 0; i < count_ - tail; i += 16) {
+    //    __m256i indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
+    //    auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
+    //    auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
+    //    _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
     //
-    //      struct ListIterator {
-    //        ListNode<T> currentNode;
-    //      };
-    auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
-    _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
+    //    auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
+    //    __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
+    //    _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
+    //    new_count += _mm_popcnt_u32(valid);
 
-    auto its_ends = _mm512_i32gather_epi64(indices, iterators_end_.data(), 8);
-    __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
-    _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
+    __m512i indices = _mm512_loadu_epi32(bucket_sel_vector_.data() + i);
+
+    auto high_indices = _mm512_extracti32x8_epi32(indices, 1);
+    auto iterators = _mm512_i32gather_epi64(high_indices, iterators_.data(), 8);
+    auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
+    _mm512_i32scatter_epi64(iterators_.data(), high_indices, next_its, 8);
+    auto its_ends = _mm512_i32gather_epi64(high_indices, iterators_end_.data(), 8);
+    __mmask16 valid = ((__mmask16) _mm512_cmpneq_epi64_mask(next_its, its_ends)) << 8;
+
+    auto low_indices = _mm512_extracti32x8_epi32(indices, 0);
+    auto iterators1 = _mm512_i32gather_epi64(low_indices, iterators_.data(), 8);
+    auto next_its1 = _mm512_i64gather_epi64(iterators1, nullptr, 1);
+    _mm512_i32scatter_epi64(iterators_.data(), low_indices, next_its1, 8);
+    auto its_ends1 = _mm512_i32gather_epi64(low_indices, iterators_end_.data(), 8);
+    valid = valid | _mm512_cmpneq_epi64_mask(next_its1, its_ends1);
+
+    _mm512_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
     new_count += _mm_popcnt_u32(valid);
   }
 
