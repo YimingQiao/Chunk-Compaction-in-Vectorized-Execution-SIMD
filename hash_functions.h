@@ -15,6 +15,7 @@ inline uint64_t murmurhash64(uint64_t x) {
   return x;
 }
 
+
 inline __m512i mm512_murmurhash64(__m512i x) {
   __m512i MAGIC_NUMBER = _mm512_set1_epi64(0xd6e8feb86659fd93U);
 

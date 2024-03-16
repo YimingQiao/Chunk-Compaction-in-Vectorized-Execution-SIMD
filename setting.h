@@ -15,11 +15,11 @@
 
 namespace simd_compaction {
 
-static uint64_t scale = 0;
+static uint64_t scale = 3;
 static uint64_t kNumKeys = 1024 << scale;
 static uint64_t kRHSTuples = 512 << scale;
-static uint64_t kRunTimes = 1;
-static uint64_t kHitFreq = 4;// hit_rate = 1 / hit_frequency
+static uint64_t kRunTimes = std::max(1, int((1 << 23) / kNumKeys));
+static uint64_t kHitFreq = 2;// hit_rate = 1 / hit_frequency
 static uint64_t kLanes = 8;
 
 // query setting

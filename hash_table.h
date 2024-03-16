@@ -38,6 +38,10 @@ class ScanStructure {
 
   uint32_t SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result);
 
+  void AdvancePointers();
+
+  void SIMDAdvancePointers();
+
   bool HasNext() const { return count_ > 0; }
 
  private:
@@ -51,10 +55,6 @@ class ScanStructure {
   size_t Match(Vector &join_key, vector<uint32_t> &result_vector);
 
   inline size_t SIMDMatch(Vector &join_key, vector<uint32_t> &result_vector);
-
-  inline void AdvancePointers();
-
-  inline void SIMDAdvancePointers();
 
   inline void GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, vector<uint32_t> &result_vector,
                            size_t count);
