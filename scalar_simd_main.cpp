@@ -39,104 +39,80 @@ int main(int argc, char *argv[]) {
   // this code is to be tested.
   std::cout << "--------------- SIMD HashJoin ---------------\n";
   {
+    CycleProfiler::Get().Init();
     HashTable hash_table(kRHSTuples, kChunkFactor);
     DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
     DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
     Vector keys_block;
 
-    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
-    uint64_t n_probe = 0, n_next = 0, n_tuples = 0;
+    uint64_t n_tuples = 0;
 
     for (uint64_t j = 0; j < kRunTimes; j++) {
       for (uint32_t k = 0; k < kNumKeys; k += kBlockSize) {
         // Load one block
-        for (uint32_t i = 0; i < kBlockSize; ++i) {
+        size_t n_filling = std::min(kBlockSize,kNumKeys - k);
+        for (uint32_t i = 0; i < n_filling; ++i) {
           keys_block[i] = keys[k + i];
           input.data_[0] = keys_block;
-          input.count_ = kBlockSize;
+          input.count_ = n_filling;
         }
 
         // Function Probe.
-        start_cycles = __rdtsc();
-
-        hash_table.SIMDProbe(keys_block, kBlockSize, sel_vector);
-
-        end_cycles = __rdtsc();
-        probe_cycles += end_cycles - start_cycles;
-        n_probe++;
+        hash_table.SIMDProbe(keys_block, n_filling, sel_vector);
 
         // Function Next.
         auto scan_structure = hash_table.GetScanStructure();
-        while (scan_structure.HasNext()) {
-          start_cycles = __rdtsc();
-
-          n_tuples += scan_structure.SIMDNext(keys_block, input, output);
-
-          end_cycles = __rdtsc();
-          next_cycles += end_cycles - start_cycles;
-          n_next++;
-        }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDNext(keys_block, input, output); }
       }
     }
-    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
-    std::cout << "Next: " << next_cycles_per_tuple << "\n";
-    std::cout << "Total: " << probe_cycles_per_tuple + next_cycles_per_tuple << "\n";
+    std::vector<double> cpts(4);
+    for (size_t i = 0; i < 4; i++) { cpts[i] = double(CycleProfiler::Get().Data(i)) / double(kNumKeys * kRunTimes); }
+    CycleProfiler::Get().Init();
+    std::cout << "Hash & Find Bucket: " << cpts[0] << "\t";
+    std::cout << "Match Tuples: " << cpts[1] << "\t";
+    std::cout << "Gather Tuples: " << cpts[2] << "\t";
+    std::cout << "Advance Pointers: " << cpts[3] << "\n";
+    std::cout << "Total: " << cpts[0] + cpts[1] + cpts[2] + cpts[3] << "\n";
     std::cout << "#tuples: " << n_tuples << "\n";
-    std::cout << "#calling of probe: " << n_probe << "\n";
-    std::cout << "#calling of next: " << n_next << "\n";
   }
 
   std::cout << "--------------- Scalar HashJoin ---------------\n";
   {
+    CycleProfiler::Get().Init();
     HashTable hash_table(kRHSTuples, kChunkFactor);
     DataChunk input(vector<AttributeType>{AttributeType::INTEGER});
     DataChunk output(vector<AttributeType>{AttributeType::INTEGER, AttributeType::INTEGER, AttributeType::INTEGER});
     Vector keys_block;
 
-    uint64_t start_cycles, end_cycles, probe_cycles = 0, next_cycles = 0;
-    uint64_t n_probe = 0, n_next = 0, n_tuples = 0;
+    uint64_t n_tuples = 0;
 
     for (uint32_t j = 0; j < kRunTimes; j++) {
       for (uint32_t k = 0; k < kNumKeys; k += kBlockSize) {
         // load one block
-        for (uint32_t i = 0; i < kBlockSize; ++i) {
+        size_t n_filling = std::min(kBlockSize,kNumKeys - k);
+        for (uint32_t i = 0; i < n_filling; ++i) {
           keys_block[i] = keys[k + i];
           input.data_[0] = keys_block;
-          input.count_ = kBlockSize;
+          input.count_ = n_filling;
         }
 
         // Function Probe.
-        start_cycles = __rdtsc();
-
-        hash_table.Probe(keys_block, kBlockSize, sel_vector);
-
-        end_cycles = __rdtsc();
-        probe_cycles += end_cycles - start_cycles;
-        n_probe++;
+        hash_table.Probe(keys_block, n_filling, sel_vector);
 
         // Function Next.
         auto scan_structure = hash_table.GetScanStructure();
-        while (scan_structure.HasNext()) {
-          start_cycles = __rdtsc();
-
-          n_tuples += scan_structure.Next(keys_block, input, output);
-
-          end_cycles = __rdtsc();
-          next_cycles += end_cycles - start_cycles;
-          n_next++;
-        }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.Next(keys_block, input, output); }
       }
     }
-    double probe_cycles_per_tuple = static_cast<double>(probe_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double next_cycles_per_tuple = static_cast<double>(next_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    std::cout << "Probe: " << probe_cycles_per_tuple << "\n";
-    std::cout << "Next: " << next_cycles_per_tuple << "\n";
-    std::cout << "Total: " << probe_cycles_per_tuple + next_cycles_per_tuple << "\n";
+
+    std::vector<double> cpts(4);
+    for (size_t i = 0; i < 4; i++) { cpts[i] = double(CycleProfiler::Get().Data(i)) / double(kNumKeys * kRunTimes); }
+    std::cout << "Hash & Find Bucket: " << cpts[0] << "\t";
+    std::cout << "Match Tuples: " << cpts[1] << "\t";
+    std::cout << "Gather Tuples: " << cpts[2] << "\t";
+    std::cout << "Advance Pointers: " << cpts[3] << "\n";
+    std::cout << "Total: " << cpts[0] + cpts[1] + cpts[2] + cpts[3] << "\n";
     std::cout << "#tuples: " << n_tuples << "\n";
-    std::cout << "#calling of probe: " << n_probe << "\n";
-    std::cout << "#calling of next: " << n_next << "\n";
   }
 
   std::cout << "--------------- Scalar with two loops ---------------\n";

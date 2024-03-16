@@ -257,4 +257,34 @@ class ZebraProfiler {
   std::mt19937 gen_;
   std::uniform_int_distribution<int> integers;
 };
+
+class CycleProfiler {
+ public:
+  static CycleProfiler &Get() {
+    static CycleProfiler instance;
+    return instance;
+  }
+
+  inline void Start() { start_cycle_ = __rdtsc(); }
+
+  inline void End(uint32_t id) {
+    end_cycle_ = __rdtsc();
+    tables_[id] += end_cycle_ - start_cycle_;
+  }
+
+  inline void Init() { std::fill(tables_.begin(), tables_.end(), 0); }
+
+  inline uint64_t Data(uint32_t id) { return tables_[id]; }
+
+ private:
+  CycleProfiler() : start_cycle_(0), end_cycle_(0), tables_(4, 0){};
+
+  uint64_t start_cycle_;
+  uint64_t end_cycle_;
+  // 0: hash & find buckets
+  // 1: Compare join keys
+  // 2: Gather matched tuples
+  // 3: Advance iterators
+  std::vector<uint64_t> tables_;
+};
 }// namespace simd_compaction
