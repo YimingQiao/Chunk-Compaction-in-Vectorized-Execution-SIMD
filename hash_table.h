@@ -13,6 +13,10 @@
 #include <list>
 #include <unordered_map>
 #include <utility>
+// An 'atomic_thread_fence' provides a stronger guarantee of memory ordering than the
+// one provided by individual atomic operations and can be used to synchronize memory
+// accesses to non-atomic variables.
+#include <atomic>
 
 #include "base.h"
 #include "hash_functions.h"

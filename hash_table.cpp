@@ -37,6 +37,7 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor) {
 
 ScanStructure HashTable::Probe(Vector &join_key) {
   vector<list<Tuple> *> ptrs(kBlockSize);
+  vector<uint32_t> ptrs_sel_vector(kBlockSize);
 
   CycleProfiler::Get().Start();
 
@@ -44,17 +45,19 @@ ScanStructure HashTable::Probe(Vector &join_key) {
     auto attr = join_key.GetValue(join_key.selection_vector_[i]);
     auto bucket_idx = murmurhash64(attr) & SCALAR_BUCKET_MASK;
     ptrs[i] = linked_lists_[bucket_idx].get();
+
+    // Force a memory fence after each operation
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+  }
+
+  size_t n_non_empty = 0;
+  for (size_t i = 0; i < join_key.count_; ++i) {
+    if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
   }
 
   CycleProfiler::Get().End(0);
 
-  size_t n_non_empty = 0;
-  vector<uint32_t> ptrs_sel_vector(kBlockSize);
-  for (size_t i = 0; i < join_key.count_; ++i) {
-    if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
-  }
   auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, join_key.selection_vector_, this);
-
   return ret;
 }
 
@@ -121,6 +124,9 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
       auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
       auto &r_key = (*iterators_[idx])[0];
       if (l_key == r_key) result_vector[result_count++] = idx;
+
+      // Force a memory fence after each operation
+      std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     CycleProfiler::Get().End(1);
@@ -140,6 +146,9 @@ void ScanStructure::AdvancePointers() {
   for (size_t i = 0; i < count_; i++) {
     auto idx = bucket_sel_vector_[i];
     if (++iterators_[idx] != buckets_[idx]->end()) bucket_sel_vector_[new_count++] = idx;
+
+    // Force a memory fence after each operation
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
   count_ = new_count;
 
@@ -154,6 +163,9 @@ void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_ve
     for (size_t i = 0; i < count; ++i) {
       auto idx = sel_vector[i];
       col.GetValue(i + col.count_) = (*iterators_[idx])[c];
+
+      // Force a memory fence after each operation
+      std::atomic_thread_fence(std::memory_order_seq_cst);
     }
     col.count_ += count;
   }
@@ -164,6 +176,7 @@ void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_ve
 // --------------------------------------------  SIMD  --------------------------------------------
 ScanStructure HashTable::SIMDProbe(Vector &join_key) {
   vector<list<Tuple> *> ptrs(kBlockSize);
+  vector<uint32_t> ptrs_sel_vector(kBlockSize);
 
   CycleProfiler::Get().Start();
 
@@ -175,23 +188,27 @@ ScanStructure HashTable::SIMDProbe(Vector &join_key) {
     __m512i bucket_indices = _mm512_and_si512(hashes, SIMD_BUCKET_MASK);
     __m512i address = _mm512_i64gather_epi64(bucket_indices, linked_lists_.data(), 8);
     _mm512_storeu_epi64(ptrs.data() + i, address);
+
+    // Force a memory fence after each operation
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   for (size_t i = join_key.count_ - tail; i < join_key.count_; ++i) {
     auto attr = join_key.GetValue(join_key.selection_vector_[i]);
     auto bucket_idx = murmurhash64(attr) & SCALAR_BUCKET_MASK;
     ptrs[i] = linked_lists_[bucket_idx].get();
+
+    // Force a memory fence after each operation
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
-  CycleProfiler::Get().End(0);
-
   size_t n_non_empty = 0;
-  vector<uint32_t> ptrs_sel_vector(kBlockSize);
   for (size_t i = 0; i < join_key.count_; ++i) {
     if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
   }
-  auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, join_key.selection_vector_, this);
+  CycleProfiler::Get().End(0);
 
+  auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, join_key.selection_vector_, this);
   return ret;
 }
 
@@ -264,6 +281,9 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
 
       _mm256_mask_compressstoreu_epi32(result_vector.data() + result_count, match, indices);
       result_count += _mm_popcnt_u32(match);
+
+      // Force a memory fence after each operation
+      std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     for (size_t i = count_ - tail; i < count_; ++i) {
@@ -271,6 +291,9 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
       auto &r_key = (*iterators_[idx])[0];
       if (l_key == r_key) result_vector[result_count++] = idx;
+
+      // Force a memory fence after each operation
+      std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     CycleProfiler::Get().End(1);
@@ -297,11 +320,17 @@ void ScanStructure::SIMDAdvancePointers() {
     __mmask8 valid = _mm512_cmpneq_epi64_mask(next_its, its_ends);
     _mm256_mask_compressstoreu_epi32(bucket_sel_vector_.data() + new_count, valid, indices);
     new_count += _mm_popcnt_u32(valid);
+
+    // Force a memory fence after each operation
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   for (size_t i = count_ - tail; i < count_; ++i) {
     auto idx = bucket_sel_vector_[i];
     if (++iterators_[idx] != buckets_[idx]->end()) bucket_sel_vector_[new_count++] = idx;
+
+    // Force a memory fence after each operation
+    std::atomic_thread_fence(std::memory_order_seq_cst);
   }
   count_ = new_count;
 
@@ -323,11 +352,17 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
       __m512i attribute = _mm512_add_epi64(nodes, _mm512_set1_epi64(8 * c));
       auto keys = _mm512_i64gather_epi64(attribute, nullptr, 1);
       _mm512_storeu_epi64(col.Data() + i + col.count_, keys);
+
+      // Force a memory fence after each operation
+      std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     for (size_t i = count - tail; i < count; i++) {
       auto idx = sel_vector[i];
       col.GetValue(i + col.count_) = (*iterators_[idx])[0];
+
+      // Force a memory fence after each operation
+      std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     col.count_ += count;
