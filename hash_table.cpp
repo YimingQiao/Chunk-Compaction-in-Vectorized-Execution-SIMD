@@ -50,12 +50,12 @@ ScanStructure HashTable::Probe(Vector &join_key) {
     // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
+  CycleProfiler::Get().End(0);
+
   size_t n_non_empty = 0;
   for (size_t i = 0; i < join_key.count_; ++i) {
     if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
   }
-
-  CycleProfiler::Get().End(0);
 
   auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, join_key.selection_vector_, this);
   return ret;
@@ -125,9 +125,9 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
       auto &r_key = (*iterators_[idx])[0];
 
       // remove branch prediction
-      result_vector[result_count] = idx;
-      result_count += (l_key == r_key);
-      // if (l_key == r_key) result_vector[result_count++] = idx;
+      //      result_vector[result_count] = idx;
+      //    result_count += (l_key == r_key);
+      if (l_key == r_key) result_vector[result_count++] = idx;
 
       // Force a memory fence after each operation
       // std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -151,9 +151,9 @@ void ScanStructure::AdvancePointers() {
     auto idx = bucket_sel_vector_[i];
 
     // remove branch prediction
-    bucket_sel_vector_[new_count] = idx;
-    new_count += (++iterators_[idx] != iterator_ends_[idx]);
-    // if (++iterators_[idx] != iterator_ends_[idx]) bucket_sel_vector_[new_count++] = idx;
+    //    bucket_sel_vector_[new_count] = idx;
+    //    new_count += (++iterators_[idx] != iterator_ends_[idx]);
+    if (++iterators_[idx] != iterator_ends_[idx]) bucket_sel_vector_[new_count++] = idx;
 
     // Force a memory fence after each operation
     // std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -212,11 +212,12 @@ ScanStructure HashTable::SIMDProbe(Vector &join_key) {
     // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
+  CycleProfiler::Get().End(0);
+
   size_t n_non_empty = 0;
   for (size_t i = 0; i < join_key.count_; ++i) {
     if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
   }
-  CycleProfiler::Get().End(0);
 
   auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, join_key.selection_vector_, this);
   return ret;
