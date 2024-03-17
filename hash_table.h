@@ -55,15 +55,15 @@ class ScanStructure {
   // buffer
   unique_ptr<DataChunk> buffer_;
 
+  inline bool HasBucket() const { return count_ > 0; }
+
+  inline bool HasBuffer() const { return buffer_ != nullptr && buffer_->count_ > 0; }
+
   size_t ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector);
 
   inline void AdvancePointers();
 
   inline void GatherResult(vector<Vector *> cols, vector<uint32_t> &result_vector, size_t count);
-
-  inline bool HasBucket() const { return count_ > 0; }
-
-  inline bool HasBuffer() const { return buffer_ != nullptr && buffer_->count_ > 0; }
 
   void NextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
 
