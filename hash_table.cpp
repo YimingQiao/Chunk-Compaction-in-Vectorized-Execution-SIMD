@@ -100,13 +100,14 @@ uint32_t ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &resu
   size_t result_count = Match(join_key, result_vector_);
 
   if (result_count > 0) {
-    CycleProfiler::Get().Start();
-
     // on the LHS, we create a slice using the result vector
     result.Slice(input, result_vector_, result_count);
 
     // on the RHS, we need to fetch the data from the hash table
     vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
+
+    CycleProfiler::Get().Start();
+
     GatherResult(cols, input.selection_vector_, result_vector_, result_count);
 
     CycleProfiler::Get().End(2);
@@ -120,8 +121,6 @@ uint32_t ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
   size_t result_count = SIMDMatch(join_key, result_vector_);
 
   if (result_count > 0) {
-    CycleProfiler::Get().Start();
-
     // matches were found
     // construct the result
     // on the LHS, we create a slice using the result vector
@@ -129,6 +128,9 @@ uint32_t ScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
 
     // on the RHS, we need to fetch the data from the hash table
     vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
+
+    CycleProfiler::Get().Start();
+
     SIMDGatherResult(cols, input.selection_vector_, result_vector_, result_count);
 
     CycleProfiler::Get().End(2);
@@ -145,17 +147,17 @@ size_t ScanStructure::Match(Vector &join_key, vector<uint32_t> &result_vector) {
   size_t result_count = 0;
   int64_t tail = count_ & 15;
 
-  CycleProfiler::Get().Start();
-
   for (size_t i = 0; i < count_ - tail; ++i) {
     size_t idx = bucket_sel_vector_[i];
     auto &l_key = join_key[key_sel_vector_[idx]];
     auto &r_key = (*iterators_[idx])[0];
-    if (l_key == r_key) result_vector[result_count++] = idx;
+
+    // if (l_key == r_key) result_vector[result_count++] = idx;
+    result_vector[result_count] = idx;
+    result_count += (l_key == r_key);
   }
 
   CycleProfiler::Get().End(1);
-
   return result_count;
 }
 
@@ -223,15 +225,16 @@ size_t ScanStructure::SIMDMatch(Vector &join_key, vector<uint32_t> &result_vecto
 
 void ScanStructure::AdvancePointers() {
   CycleProfiler::Get().Start();
-
   size_t new_count = 0;
-  int64_t tail = count_ & 15;
+  int32_t tail = count_ & 15;
   for (size_t i = 0; i < count_ - tail; i++) {
     auto idx = bucket_sel_vector_[i];
-    if (++iterators_[idx] != iterators_end_[idx]) { bucket_sel_vector_[new_count++] = idx; }
+
+    bucket_sel_vector_[new_count] = idx;
+    new_count += ++iterators_[idx] != iterators_end_[idx];
+    // if (++iterators_[idx] != iterators_end_[idx]) { bucket_sel_vector_[new_count++] = idx; }
   }
   count_ = new_count;
-
   CycleProfiler::Get().End(3);
 }
 
@@ -274,16 +277,14 @@ void ScanStructure::SIMDAdvancePointers() {
 
 void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, vector<uint32_t> &result_vector,
                                  size_t count) {
-  for (size_t i = 0; i < count; ++i) {
+  int32_t tail = count & 7;
+  for (size_t i = 0; i < count - tail; ++i) {
     auto idx = result_vector[i];
     auto &tuple = *iterators_[idx];
 
     // columns from the right table align with the selection vector given by the left table
     size_t pos = sel_vector[idx];
-    for (size_t j = 0; j < cols.size(); ++j) {
-      auto &col = *cols[j];
-      col.GetValue(pos) = tuple[j];
-    }
+    for (size_t j = 0; j < cols.size(); ++j) { (*cols[j])[pos] = tuple[j]; }
   }
 }
 
@@ -294,26 +295,25 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
     __m256i indices = _mm256_loadu_epi32(result_vector.data() + i);
     auto positions = _mm256_i32gather_epi32((int *) sel_vector.data(), indices, 4);
     auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
-    iterators = _mm512_add_epi64(iterators, _mm512_set1_epi64(16));
+    iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
     auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
 
     for (size_t j = 0; j < cols.size(); ++j) {
-      auto &col = *cols[j];
       __m512i attribute = _mm512_add_epi64(nodes, _mm512_set1_epi64(8 * j));
       auto keys = _mm512_i64gather_epi64(attribute, nullptr, 1);
-      _mm512_i32scatter_epi64(col.data_->data(), positions, keys, 8);
+      _mm512_i32scatter_epi64(cols[j]->data_->data(), positions, keys, 8);
     }
   }
 
-  for (int32_t i = count - tail; i < count; ++i) {
-    auto idx = result_vector[i];
-    auto &tuple = *iterators_[idx];
-    size_t pos = sel_vector[idx];
-
-    for (size_t j = 0; j < cols.size(); ++j) {
-      auto &col = *cols[j];
-      col.GetValue(pos) = tuple[j];
-    }
-  }
+  //  for (int32_t i = count - tail; i < count; ++i) {
+  //    auto idx = result_vector[i];
+  //    auto &tuple = *iterators_[idx];
+  //    size_t pos = sel_vector[idx];
+  //
+  //    for (size_t j = 0; j < cols.size(); ++j) {
+  //      auto &col = *cols[j];
+  //      col.GetValue(pos) = tuple[j];
+  //    }
+  //  }
 }
 }// namespace simd_compaction

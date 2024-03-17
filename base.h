@@ -34,13 +34,13 @@ using std::unordered_map;
 using std::vector;
 using idx_t = size_t;
 
-constexpr uint64_t kScale = 0;
+constexpr uint64_t kScale = 6;
 
 // work set = left data chunk (block) + right hash table
 constexpr size_t kBlockSize = 256 << kScale;
 constexpr uint64_t kRHSTuples = 128 << kScale;
-constexpr uint64_t kLHSTuples = 1024 << 15;
-constexpr uint64_t kHitFreq = 2;
+constexpr uint64_t kLHSTuples = 1024 << 13;
+constexpr uint64_t kHitFreq = 4;
 
 // query setting
 constexpr size_t kJoins = 3;

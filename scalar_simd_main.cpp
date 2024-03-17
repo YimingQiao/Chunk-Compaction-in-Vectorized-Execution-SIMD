@@ -33,8 +33,8 @@ int main(int argc, char *argv[]) {
   for (uint32_t i = 0; i < kBlockSize; ++i) { sel_vector[i] = i; }
 
   // LHS: 64-bit keys. RHS: 64-bit keys, and 64-bit payloads
-  std::cout << "Work set size (LHS Block Size + RHS Hash Table Size): " << 8 * (kBlockSize) / 1024.0 << " KB + " << 8 * (kRHSTuples * 2) / 1024.0
-            << " KB\n";
+  std::cout << "Work set size (LHS Block Size + RHS Hash Table Size): " << 8 * (kBlockSize) / 1024.0 << " KB + "
+            << 8 * (kRHSTuples * 2) / 1024.0 << " KB\n";
 
   // this code is to be tested.
   std::cout << "--------------- SIMD HashJoin ---------------\n";
@@ -55,16 +55,18 @@ int main(int argc, char *argv[]) {
         input.count_ = n_filling;
       }
 
-      // Function Probe.
-      hash_table.SIMDProbe(keys_block, n_filling, sel_vector);
+      for (uint32_t i = 0; i < 1; i++) {
+        // Function Probe.
+        hash_table.SIMDProbe(keys_block, n_filling, sel_vector);
 
-      // Function Next.
-      auto scan_structure = hash_table.GetScanStructure();
-      while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDNext(keys_block, input, output); }
+        // Function Next.
+        auto scan_structure = hash_table.GetScanStructure();
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDNext(keys_block, input, output); }
+      }
     }
 
     std::vector<double> cpts(4);
-    for (size_t i = 0; i < 4; i++) { cpts[i] = double(CycleProfiler::Get().Data(i)) / double(kLHSTupleSize); }
+    for (size_t i = 0; i < 4; i++) { cpts[i] = double(CycleProfiler::Get().Data(i)) / double(kLHSTuples); }
     CycleProfiler::Get().Init();
     std::cout << "Hash & Find Bucket: " << cpts[0] << "\t";
     std::cout << "Match Tuples: " << cpts[1] << "\t";
@@ -93,16 +95,18 @@ int main(int argc, char *argv[]) {
         input.count_ = n_filling;
       }
 
-      // Function Probe.
-      hash_table.Probe(keys_block, n_filling, sel_vector);
+      for (uint32_t i = 0; i < 1; i++) {
+        // Function Probe.
+        hash_table.Probe(keys_block, n_filling, sel_vector);
 
-      // Function Next.
-      auto scan_structure = hash_table.GetScanStructure();
-      while (scan_structure.HasNext()) { n_tuples += scan_structure.Next(keys_block, input, output); }
+        // Function Next.
+        auto scan_structure = hash_table.GetScanStructure();
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.Next(keys_block, input, output); }
+      }
     }
 
     std::vector<double> cpts(4);
-    for (size_t i = 0; i < 4; i++) { cpts[i] = double(CycleProfiler::Get().Data(i)) / double(kLHSTupleSize); }
+    for (size_t i = 0; i < 4; i++) { cpts[i] = double(CycleProfiler::Get().Data(i)) / double(kLHSTuples); }
     std::cout << "Hash & Find Bucket: " << cpts[0] << "\t";
     std::cout << "Match Tuples: " << cpts[1] << "\t";
     std::cout << "Gather Tuples: " << cpts[2] << "\t";
