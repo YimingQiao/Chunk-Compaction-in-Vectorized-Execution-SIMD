@@ -34,7 +34,20 @@ using std::unordered_map;
 using std::vector;
 using idx_t = size_t;
 
-constexpr size_t kBlockSize = 2048;
+constexpr uint64_t kScale = 0;
+
+// work set = left data chunk (block) + right hash table
+constexpr size_t kBlockSize = 256 << kScale;
+constexpr uint64_t kRHSTuples = 128 << kScale;
+constexpr uint64_t kLHSTuples = 1024 << 15;
+constexpr uint64_t kHitFreq = 2;
+
+// query setting
+constexpr size_t kJoins = 3;
+constexpr size_t kLHSTupleSize = 2e7;
+constexpr size_t kRHSTupleSize = 2e6;
+constexpr size_t kChunkFactor = 1;
+static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
 
 // Attribute includes three types: integer, float-point number, and the string.
 using Attribute = int64_t;

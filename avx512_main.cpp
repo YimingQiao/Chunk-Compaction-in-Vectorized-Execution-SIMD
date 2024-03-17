@@ -30,19 +30,19 @@ int main(int argc, char *argv[]) {
 
   // use avx512 gather to gather effective values
   Vector keys;
-  std::vector<uint32_t> sel_vector(kNumKeys);
-  for (uint64_t i = 0; i < kNumKeys; ++i) {
+  std::vector<uint32_t> sel_vector(kLHSTuples);
+  for (uint64_t i = 0; i < kLHSTuples; ++i) {
     keys[i] = int64_t(i);
     sel_vector[i] = i;
   }
 
   std::cout << "Sizeof(key): " << sizeof(keys[0]) << "\n";
-  std::cout << "Workload Size: " << 8 * kNumKeys / 1024 << " KB\n";
+  std::cout << "Workload Size: " << 8 * kLHSTuples / 1024 << " KB\n";
 
   std::cout << "--------------- SIMD with two loop ---------------\n";
   {
-    std::vector<uint64_t> simd_buckets(kNumKeys, 0);
-    std::vector<int64_t> loaded_keys(kNumKeys, 0);
+    std::vector<uint64_t> simd_buckets(kLHSTuples, 0);
+    std::vector<int64_t> loaded_keys(kLHSTuples, 0);
     const uint64_t kLanes = 8;
     uint64_t start_cycles, end_cycles, gather_cycles = 0, hash_cycles = 0;
 
@@ -53,7 +53,7 @@ int main(int argc, char *argv[]) {
 
       // gather
       int64_t *keys_data = keys.data_->data();
-      for (uint64_t i = 0; i < kNumKeys; i += kLanes * 64) {
+      for (uint64_t i = 0; i < kLHSTuples; i += kLanes * 64) {
         __m256i indices0 = _mm256_loadu_epi32(sel_vector.data() + i + kLanes * 0);
         __m512i gathered_values0 = _mm512_i32gather_epi64(indices0, keys_data, 8);
         _mm512_storeu_epi64(loaded_keys.data() + i + kLanes * 0, gathered_values0);
@@ -316,7 +316,7 @@ int main(int argc, char *argv[]) {
       start_cycles = __rdtsc();
 
       // hash
-      for (uint64_t i = 0; i < kNumKeys; i += 8) {
+      for (uint64_t i = 0; i < kLHSTuples; i += 8) {
         __m512i gathered_values0 = _mm512_loadu_epi64(loaded_keys.data() + i + kLanes * 0);
         __m512i hashes0 = mm512_murmurhash64(gathered_values0);
         __m512i bucket_indices0 = _mm512_and_si512(hashes0, BUCKET_MASK);
@@ -327,8 +327,8 @@ int main(int argc, char *argv[]) {
       hash_cycles += end_cycles - start_cycles;
     }
 
-    double gather_cycles_per_tuple = static_cast<double>(gather_cycles) / static_cast<double>(kNumKeys * kRunTimes);
-    double hash_cycles_per_tuple = static_cast<double>(hash_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double gather_cycles_per_tuple = static_cast<double>(gather_cycles) / static_cast<double>(kLHSTuples * kRunTimes);
+    double hash_cycles_per_tuple = static_cast<double>(hash_cycles) / static_cast<double>(kLHSTuples * kRunTimes);
     std::cout << "Gather: " << gather_cycles_per_tuple << "\t";
     std::cout << "Hash: " << hash_cycles_per_tuple << "\t";
     std::cout << "Probe: " << gather_cycles_per_tuple + hash_cycles_per_tuple << "\n";
@@ -336,8 +336,8 @@ int main(int argc, char *argv[]) {
 
   std::cout << "--------------- SIMD with one loop ---------------\n";
   {
-    std::vector<uint64_t> simd_buckets(kNumKeys, 0);
-    std::vector<int64_t> loaded_keys(kNumKeys, 0);
+    std::vector<uint64_t> simd_buckets(kLHSTuples, 0);
+    std::vector<int64_t> loaded_keys(kLHSTuples, 0);
     const uint64_t kLanes = 8;
     uint64_t start_cycles, end_cycles;
 
@@ -346,7 +346,7 @@ int main(int argc, char *argv[]) {
     __m512i BUCKET_MASK = _mm512_set1_epi64(kRHSTuples - 1);
     for (uint32_t j = 0; j < kRunTimes; j++) {
       int64_t *keys_data = keys.data_->data();
-      for (uint64_t i = 0; i < kNumKeys; i += kLanes * 64) {
+      for (uint64_t i = 0; i < kLHSTuples; i += kLanes * 64) {
         __m256i indices0 = _mm256_loadu_epi32(sel_vector.data() + i + kLanes * 0);
         __m512i gathered_values0 = _mm512_i32gather_epi64(indices0, keys_data, 8);
         __m512i hashes0 = mm512_murmurhash64(gathered_values0);
@@ -736,7 +736,7 @@ int main(int argc, char *argv[]) {
     end_cycles = __rdtsc();
 
     uint64_t total_cycles = end_cycles - start_cycles;
-    double cycles_per_tuple = static_cast<double>(total_cycles) / static_cast<double>(kNumKeys * kRunTimes);
+    double cycles_per_tuple = static_cast<double>(total_cycles) / static_cast<double>(kLHSTuples * kRunTimes);
     std::cout << "Probe Cycles per tuple: " << cycles_per_tuple << "\n";
   }
 }

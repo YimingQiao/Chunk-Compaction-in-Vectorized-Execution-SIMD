@@ -15,20 +15,6 @@
 
 namespace simd_compaction {
 
-static uint64_t scale = 3;
-static uint64_t kNumKeys = 1024 << scale;
-static uint64_t kRHSTuples = 512 << scale;
-static uint64_t kRunTimes = std::max(1, int((1 << 23) / kNumKeys));
-static uint64_t kHitFreq = 2;// hit_rate = 1 / hit_frequency
-static uint64_t kLanes = 8;
-
-// query setting
-static size_t kJoins = 3;
-static size_t kLHSTupleSize = 2e7;
-static size_t kRHSTupleSize = 2e6;
-static size_t kChunkFactor = 1;
-static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
-
 // compaction setting
 #ifdef flag_full_compact
 using Compactor = NaiveCompactor;

@@ -9,12 +9,12 @@ buckets:        vector of uint64
 std::vector<uint64_t> gathered_keys;
 
 // Gather
-for (uint64_t i = 0; i < kNumKeys; i ++) {
+for (uint64_t i = 0; i < kLHSTuples; i ++) {
     gathered_keys[i] = keys[sel_vector[i]];
 }
 
 // Hash
-for (uint64_t i = 0; i < kNumKeys; i ++) {
+for (uint64_t i = 0; i < kLHSTuples; i ++) {
     uint64 key = gathered_keys[i];
     buckets[i] = HashFunction(key) & (kRHSTuples - 1);
 }
@@ -31,7 +31,7 @@ SIMD (cycle per key)                                    Gather: 0.398755	Hash: 0
 
 ----------------------------------- Vector Scalar Probing Style 2 -----------------------------------
 // Gather and Hash
-for (uint64_t i = 0; i < kNumKeys; i ++) {
+for (uint64_t i = 0; i < kLHSTuples; i ++) {
     uint64 key = keys[sel_vector[i]];
     buckets[i] = HashFunction(key) & (kRHSTuples - 1);
 }

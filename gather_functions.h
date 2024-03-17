@@ -8,7 +8,7 @@ namespace simd_compaction {
 
 // It uses AVX2 gather if inlined, otherwise use scalar gather.
 inline std::vector<int64_t> &ScalarGather(const vector<Attribute> &keys, const vector<uint32_t> &sel_vector, vector<int64_t> &loaded_keys) {
-  for (uint64_t i = 0; i < kNumKeys; i += 8) {
+  for (uint64_t i = 0; i < kLHSTuples; i += 8) {
     int64_t key0 = keys[sel_vector[i + 0]];
     loaded_keys[i + 0] = key0;
 
@@ -39,10 +39,10 @@ inline std::vector<int64_t> &ScalarGather(const vector<Attribute> &keys, const v
 inline std::vector<int64_t> &SIMDGather(const vector<Attribute> &keys, const vector<uint32_t> &sel_vector, vector<int64_t> &loaded_keys, uint64_t n_keys) {
   auto *keys_data = keys.data();
   uint64_t i;
-  uint64_t n_full_chunks = n_keys / kLanes;// number of full chunks that fit into data
+  uint64_t n_full_chunks = n_keys / 8;// number of full chunks that fit into data
 
   // process full chunks using SIMD
-  for (i = 0; i < n_full_chunks * kLanes; i += kLanes) {
+  for (i = 0; i < n_full_chunks * 8; i += 8) {
     __m256i indices = _mm256_loadu_si256((__m256i_u *) (sel_vector.data() + i));
     __m512i gathered_values = _mm512_i32gather_epi64(indices, (void *) keys_data, 8);
     _mm512_storeu_si512((__m512i *) (loaded_keys.data() + i), gathered_values);
