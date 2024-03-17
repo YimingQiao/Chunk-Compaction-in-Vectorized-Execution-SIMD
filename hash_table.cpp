@@ -7,12 +7,12 @@ HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor)
   // number of buckets should be the minimum exp number of 2.
   n_buckets_ = 1;
   while (n_buckets_ < 2 * n_rhs_tuples) n_buckets_ *= 2;
-
-  SCALAR_BUCKET_MASK = n_buckets_ - 1;
-  BUCKET_MASK = _mm512_set1_epi64(n_buckets_ - 1);
-
   linked_lists_.resize(n_buckets_);
   for (auto &bucket : linked_lists_) bucket = std::make_unique<list<Tuple>>();
+
+  // mask
+  SCALAR_BUCKET_MASK = n_buckets_ - 1;
+  BUCKET_MASK = _mm512_set1_epi64(n_buckets_ - 1);
 
   // Tuple in Hash Table
   vector<Tuple> rhs_table(n_rhs_tuples);
