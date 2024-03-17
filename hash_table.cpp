@@ -47,7 +47,7 @@ ScanStructure HashTable::Probe(Vector &join_key) {
     ptrs[i] = linked_lists_[bucket_idx].get();
 
     // Force a memory fence after each operation
-    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   size_t n_non_empty = 0;
@@ -126,7 +126,7 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
       if (l_key == r_key) result_vector[result_count++] = idx;
 
       // Force a memory fence after each operation
-      std::atomic_thread_fence(std::memory_order_seq_cst);
+      // std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     CycleProfiler::Get().End(1);
@@ -148,7 +148,7 @@ void ScanStructure::AdvancePointers() {
     if (++iterators_[idx] != buckets_[idx]->end()) bucket_sel_vector_[new_count++] = idx;
 
     // Force a memory fence after each operation
-    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
   count_ = new_count;
 
@@ -165,7 +165,7 @@ void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_ve
       col.GetValue(i + col.count_) = (*iterators_[idx])[c];
 
       // Force a memory fence after each operation
-      std::atomic_thread_fence(std::memory_order_seq_cst);
+      // std::atomic_thread_fence(std::memory_order_seq_cst);
     }
     col.count_ += count;
   }
@@ -183,6 +183,8 @@ ScanStructure HashTable::SIMDProbe(Vector &join_key) {
   int32_t tail = join_key.count_ & 7;
   for (uint64_t i = 0; i < join_key.count_ - tail; i += 8) {
     __m256i indices = _mm256_loadu_epi32(join_key.selection_vector_.data() + i);
+    //    __m512i indices512 = _mm512_loadu_epi32(join_key.selection_vector_.data() + i);
+    //    auto indices = _mm512_extracti64x4_epi64(indices512, 0);
     auto keys = _mm512_i32gather_epi64(indices, join_key.Data(), 8);
     __m512i hashes = mm512_murmurhash64(keys);
     __m512i bucket_indices = _mm512_and_si512(hashes, SIMD_BUCKET_MASK);
@@ -190,7 +192,7 @@ ScanStructure HashTable::SIMDProbe(Vector &join_key) {
     _mm512_storeu_epi64(ptrs.data() + i, address);
 
     // Force a memory fence after each operation
-    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   for (size_t i = join_key.count_ - tail; i < join_key.count_; ++i) {
@@ -199,7 +201,7 @@ ScanStructure HashTable::SIMDProbe(Vector &join_key) {
     ptrs[i] = linked_lists_[bucket_idx].get();
 
     // Force a memory fence after each operation
-    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   size_t n_non_empty = 0;
@@ -272,6 +274,8 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
     int64_t tail = count_ & 7;
     for (size_t i = 0; i < count_ - tail; i += 8) {
       auto indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
+      //      __m512i indices512 = _mm512_loadu_epi32(bucket_sel_vector_.data() + i);
+      //      auto indices = _mm512_extracti64x4_epi64(indices512, 0);
       auto l_keys = _mm512_i32gather_epi64(indices, join_key.Data(), 8);
       auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
       iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
@@ -283,7 +287,7 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       result_count += _mm_popcnt_u32(match);
 
       // Force a memory fence after each operation
-      std::atomic_thread_fence(std::memory_order_seq_cst);
+      // std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     for (size_t i = count_ - tail; i < count_; ++i) {
@@ -293,7 +297,7 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       if (l_key == r_key) result_vector[result_count++] = idx;
 
       // Force a memory fence after each operation
-      std::atomic_thread_fence(std::memory_order_seq_cst);
+      // std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     CycleProfiler::Get().End(1);
@@ -313,6 +317,8 @@ void ScanStructure::SIMDAdvancePointers() {
   size_t new_count = 0;
   for (size_t i = 0; i < count_ - tail; i += 8) {
     auto indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
+    //    __m512i indices512 = _mm512_loadu_epi32(bucket_sel_vector_.data() + i);
+    //    auto indices = _mm512_extracti64x4_epi64(indices512, 0);
     auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
     auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
     _mm512_i32scatter_epi64(iterators_.data(), indices, next_its, 8);
@@ -322,7 +328,7 @@ void ScanStructure::SIMDAdvancePointers() {
     new_count += _mm_popcnt_u32(valid);
 
     // Force a memory fence after each operation
-    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
 
   for (size_t i = count_ - tail; i < count_; ++i) {
@@ -330,7 +336,7 @@ void ScanStructure::SIMDAdvancePointers() {
     if (++iterators_[idx] != buckets_[idx]->end()) bucket_sel_vector_[new_count++] = idx;
 
     // Force a memory fence after each operation
-    std::atomic_thread_fence(std::memory_order_seq_cst);
+    // std::atomic_thread_fence(std::memory_order_seq_cst);
   }
   count_ = new_count;
 
@@ -346,6 +352,8 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
     int32_t tail = count & 7;
     for (size_t i = 0; i < count - tail; i += 8) {
       __m256i indices = _mm256_loadu_epi32(sel_vector.data() + i);
+      //      __m512i indices512 = _mm512_loadu_epi32(sel_vector.data() + i);
+      //      auto indices = _mm512_extracti64x4_epi64(indices512, 0);
       auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
       iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
       auto nodes = _mm512_i64gather_epi64(iterators, nullptr, 1);
@@ -354,7 +362,7 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
       _mm512_storeu_epi64(col.Data() + i + col.count_, keys);
 
       // Force a memory fence after each operation
-      std::atomic_thread_fence(std::memory_order_seq_cst);
+      // std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     for (size_t i = count - tail; i < count; i++) {
@@ -362,7 +370,7 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &se
       col.GetValue(i + col.count_) = (*iterators_[idx])[0];
 
       // Force a memory fence after each operation
-      std::atomic_thread_fence(std::memory_order_seq_cst);
+      // std::atomic_thread_fence(std::memory_order_seq_cst);
     }
 
     col.count_ += count;
