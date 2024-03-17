@@ -31,9 +31,11 @@ class ScanStructure {
       : count_(count), buckets_(std::move(buckets)), bucket_sel_vector_(std::move(bucket_sel_vector)),
         key_sel_vector_(key_sel_vector), ht_(ht) {
     iterators_.resize(kBlockSize);
+    iterator_ends_.resize(kBlockSize);
     for (size_t i = 0; i < count; ++i) {
       auto idx = bucket_sel_vector_[i];
       iterators_[idx] = buckets_[idx]->begin();
+      iterator_ends_[idx] = buckets_[idx]->end();
     }
   }
 
@@ -47,6 +49,7 @@ class ScanStructure {
   vector<uint32_t> bucket_sel_vector_;
   vector<uint32_t> &key_sel_vector_;
   vector<list<Tuple>::iterator> iterators_;
+  vector<list<Tuple>::iterator> iterator_ends_;
   HashTable *ht_;
 
   // buffer
@@ -63,6 +66,19 @@ class ScanStructure {
   inline bool HasBuffer() const { return buffer_ != nullptr && buffer_->count_ > 0; }
 
   void NextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
+
+  // ----------------------------  SIMD  ----------------------------
+ public:
+  size_t SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result, bool compact_mode = true);
+
+ private:
+  void SIMDNextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
+
+  size_t SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector);
+
+  inline void SIMDAdvancePointers();
+
+  inline void SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, size_t count);
 };
 
 class HashTable {

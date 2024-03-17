@@ -59,7 +59,7 @@ int main(int argc, char *argv[]) {
         auto scan_structure = hash_table.SIMDProbe(keys_block);
 
         // Function Next.
-        while (scan_structure.HasNext()) { n_tuples += scan_structure.Next(keys_block, input, output); }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDNext(keys_block, input, output); }
       }
     }
 

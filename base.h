@@ -74,7 +74,7 @@ class Vector {
 
   inline void Reset() { count_ = 0; }
 
-  inline void *Data() { return data_->data(); }
+  inline auto *Data() { return data_->data(); }
 
  private:
   shared_ptr<vector<Attribute>> data_;
