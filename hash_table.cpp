@@ -152,9 +152,9 @@ size_t ScanStructure::Match(Vector &join_key, vector<uint32_t> &result_vector) {
     auto &l_key = join_key[key_sel_vector_[idx]];
     auto &r_key = (*iterators_[idx])[0];
 
-    // if (l_key == r_key) result_vector[result_count++] = idx;
-    result_vector[result_count] = idx;
-    result_count += (l_key == r_key);
+    if (l_key == r_key) result_vector[result_count++] = idx;
+//    result_vector[result_count] = idx;
+//    result_count += (l_key == r_key);
   }
 
   CycleProfiler::Get().End(1);
@@ -230,9 +230,9 @@ void ScanStructure::AdvancePointers() {
   for (size_t i = 0; i < count_ - tail; i++) {
     auto idx = bucket_sel_vector_[i];
 
-    bucket_sel_vector_[new_count] = idx;
-    new_count += ++iterators_[idx] != iterators_end_[idx];
-    // if (++iterators_[idx] != iterators_end_[idx]) { bucket_sel_vector_[new_count++] = idx; }
+//    bucket_sel_vector_[new_count] = idx;
+//    new_count += ++iterators_[idx] != iterators_end_[idx];
+    if (++iterators_[idx] != iterators_end_[idx]) { bucket_sel_vector_[new_count++] = idx; }
   }
   count_ = new_count;
   CycleProfiler::Get().End(3);
