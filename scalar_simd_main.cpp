@@ -57,10 +57,9 @@ int main(int argc, char *argv[]) {
 
       for (uint32_t i = 0; i < 1; i++) {
         // Function Probe.
-        hash_table.SIMDProbe(keys_block, n_filling, sel_vector);
+        auto scan_structure = hash_table.SIMDProbe(keys_block, n_filling, sel_vector);
 
         // Function Next.
-        auto scan_structure = hash_table.GetScanStructure();
         while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDNext(keys_block, input, output); }
       }
     }
@@ -97,10 +96,9 @@ int main(int argc, char *argv[]) {
 
       for (uint32_t i = 0; i < 1; i++) {
         // Function Probe.
-        hash_table.Probe(keys_block, n_filling, sel_vector);
+        auto scan_structure = hash_table.Probe(keys_block, n_filling, sel_vector);
 
         // Function Next.
-        auto scan_structure = hash_table.GetScanStructure();
         while (scan_structure.HasNext()) { n_tuples += scan_structure.Next(keys_block, input, output); }
       }
     }
