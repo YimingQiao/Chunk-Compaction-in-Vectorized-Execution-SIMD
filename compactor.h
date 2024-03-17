@@ -10,7 +10,7 @@
 
 #include "base.h"
 
-namespace compaction {
+namespace simd_compaction {
 class NaiveCompactor {
  public:
   explicit NaiveCompactor(vector<AttributeType> &types)

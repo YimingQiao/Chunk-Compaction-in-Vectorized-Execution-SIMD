@@ -8,7 +8,7 @@
 #include "compactor.h"
 #include "setting.h"
 
-using namespace compaction;
+using namespace simd_compaction;
 
 struct PipelineState {
   vector<unique_ptr<HashTable>> hts;
@@ -49,8 +49,8 @@ int main(int argc, char *argv[]) {
   vector<AttributeType> types;
   for (size_t i = 0; i < kJoins; ++i) types.push_back(AttributeType::INTEGER);
   types.push_back(AttributeType::STRING);
-  compaction::DataCollection table(types);
-  vector<compaction::Attribute> tuple(kJoins + 1);
+  simd_compaction::DataCollection table(types);
+  vector<simd_compaction::Attribute> tuple(kJoins + 1);
   tuple[kJoins] = "|";
   for (size_t i = 0; i < kLHSTupleSize; ++i) {
     for (size_t j = 0; j < kJoins; ++j) tuple[j] = size_t(dist(gen));

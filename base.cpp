@@ -1,7 +1,7 @@
 
 #include "base.h"
 
-namespace compaction {
+namespace simd_compaction {
 
 void Vector::Append(Vector &other, size_t num, size_t offset) {
   assert(count_ + num <= kBlockSize);

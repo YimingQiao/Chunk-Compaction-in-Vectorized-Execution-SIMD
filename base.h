@@ -9,34 +9,48 @@
 
 #pragma once
 
-#include <memory>
-#include <vector>
-#include <variant>
-#include <iostream>
 #include <cassert>
+#include <immintrin.h>
+#include <iostream>
 #include <list>
+#include <memory>
 #include <unordered_map>
+#include <variant>
+#include <vector>
 
-namespace compaction {
+namespace simd_compaction {
+const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
+const static __m512i ALL_ONE = _mm512_set1_epi64(1);
+const static __m512i ALL_EIGHT = _mm512_set1_epi64(8);
+const static __m512i ALL_SIXTEEN = _mm512_set1_epi64(16);
+
 // Some data structures
-using std::vector;
 using std::list;
 using std::shared_ptr;
+using std::string;
 using std::unique_ptr;
 using std::unordered_map;
-using std::string;
+using std::vector;
 
-constexpr size_t kBlockSize = 2048;
+constexpr uint64_t kScale = 1;
+
+// work set = left data chunk (block) + right hash table
+constexpr size_t kBlockSize = 256 << kScale;
+constexpr uint64_t kRHSTuples = 128 << kScale;
+constexpr uint64_t kLHSTuples = 1024 << 13;
+constexpr uint64_t kHitFreq = 2;
+
+// query setting
+constexpr size_t kJoins = 3;
+constexpr size_t kLHSTupleSize = 2e7;
+constexpr size_t kRHSTupleSize = 2e6;
+constexpr size_t kChunkFactor = 1;
+static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
 
 // Attribute includes three types: integer, float-point number, and the string.
-using Attribute = std::variant<size_t, double, std::string>;
+using Attribute = int64_t;
 
-enum class AttributeType : uint8_t {
-  INTEGER = 0,
-  DOUBLE = 1,
-  STRING = 2,
-  INVALID = 3
-};
+enum class AttributeType : uint8_t { INTEGER = 0, INVALID = 3 };
 
 // The vector uses Row ID.
 class Vector {
@@ -56,13 +70,11 @@ class Vector {
 
   inline void Reference(Vector &other);
 
-  Attribute &GetValue(size_t idx) {
-    return (*data_)[idx];
-  }
+  Attribute &GetValue(size_t idx) { return (*data_)[idx]; }
 
-  inline void Reset() {
-    count_ = 0;
-  }
+  inline void Reset() { count_ = 0; }
+
+  inline void *Data() { return data_->data(); }
 
  private:
   shared_ptr<vector<Attribute>> data_;
@@ -88,4 +100,4 @@ class DataChunk {
     for (Vector &col : data_) col.Reset();
   };
 };
-}
+}// namespace simd_compaction

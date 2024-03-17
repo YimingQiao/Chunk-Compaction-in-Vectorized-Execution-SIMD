@@ -11,7 +11,7 @@
 
 #include "base.h"
 
-namespace compaction {
+namespace simd_compaction {
 class DataCollection {
  public:
   explicit DataCollection(vector<AttributeType> &types) : types_(types), n_tuples_(0) {}

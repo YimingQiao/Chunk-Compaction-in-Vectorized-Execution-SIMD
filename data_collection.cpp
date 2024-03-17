@@ -1,13 +1,13 @@
 
 #include "data_collection.h"
 
-namespace compaction {
-void compaction::DataCollection::AppendTuple(std::vector<compaction::Attribute> &tuple) {
+namespace simd_compaction {
+void simd_compaction::DataCollection::AppendTuple(std::vector<simd_compaction::Attribute> &tuple) {
   collection_.push_back(tuple);
   ++n_tuples_;
 }
 
-void compaction::DataCollection::AppendChunk(compaction::DataChunk &chunk) {
+void simd_compaction::DataCollection::AppendChunk(simd_compaction::DataChunk &chunk) {
   assert(types_ == chunk.types_);
   collection_.resize(chunk.count_ + n_tuples_);
 
@@ -22,7 +22,7 @@ void compaction::DataCollection::AppendChunk(compaction::DataChunk &chunk) {
   n_tuples_ += chunk.count_;
 }
 
-compaction::DataChunk compaction::DataCollection::FetchChunk(size_t start, size_t end) {
+simd_compaction::DataChunk simd_compaction::DataCollection::FetchChunk(size_t start, size_t end) {
   DataChunk chunk(types_);
   for (size_t i = start; i < end; ++i) {
     chunk.AppendTuple(collection_[i]);
@@ -30,7 +30,7 @@ compaction::DataChunk compaction::DataCollection::FetchChunk(size_t start, size_
   return chunk;
 }
 
-void compaction::DataCollection::Print(size_t n_tuple) {
+void simd_compaction::DataCollection::Print(size_t n_tuple) {
   n_tuple = std::min(n_tuple, n_tuples_);
 
   for (size_t i = 0; i < n_tuple; ++i) {

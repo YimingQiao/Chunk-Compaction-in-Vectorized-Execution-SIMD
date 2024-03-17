@@ -5,7 +5,7 @@
 #include "base.h"
 #include "profiler.h"
 
-namespace compaction {
+namespace simd_compaction {
 
 class SIMDHashTable {
  public:

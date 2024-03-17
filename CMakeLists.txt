@@ -19,5 +19,12 @@ add_executable(compaction
         simd_hash_table.cpp
         simd_hash_table.h)
 
-# If you have any libraries, you can link them like this:
-# target_link_libraries(YourProjectName your_library)
+# Scalar code, w/ -march=native
+add_executable(scalar_hash_native scalar_simd_main.cpp base.cpp hash_table.cpp
+        hash_functions.h)
+target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
+
+# Scalar code, w/o -march=native
+add_executable(scalar_hash scalar_simd_main.cpp base.cpp hash_table.cpp
+        hash_functions.h)
+target_compile_options(scalar_hash PRIVATE -funroll-loops -mavx512f -mavx512dq -mavx512vl)
