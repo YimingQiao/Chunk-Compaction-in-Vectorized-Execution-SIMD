@@ -49,11 +49,9 @@ int main(int argc, char *argv[]) {
     for (uint32_t k = 0; k < kLHSTuples; k += kBlockSize) {
       // Load one block
       size_t n_filling = std::min(kBlockSize, kLHSTuples - k);
-      for (uint32_t i = 0; i < n_filling; ++i) {
-        keys_block[i] = keys[k + i];
-        input.data_[0] = keys_block;
-        input.count_ = n_filling;
-      }
+      for (uint32_t i = 0; i < n_filling; ++i) { keys_block[i] = keys[k + i]; }
+      input.data_[0] = keys_block;
+      input.count_ = n_filling;
 
       for (uint32_t i = 0; i < 1; i++) {
         // Function Probe.
@@ -86,13 +84,11 @@ int main(int argc, char *argv[]) {
     uint64_t n_tuples = 0;
 
     for (uint32_t k = 0; k < kLHSTuples; k += kBlockSize) {
-      // load one block
+//      // Load one block
       size_t n_filling = std::min(kBlockSize, kLHSTuples - k);
-      for (uint32_t i = 0; i < n_filling; ++i) {
-        keys_block[i] = keys[k + i];
-        input.data_[0] = keys_block;
-        input.count_ = n_filling;
-      }
+      for (uint32_t i = 0; i < n_filling; ++i) { keys_block[i] = keys[k + i]; }
+      input.data_[0] = keys_block;
+      input.count_ = n_filling;
 
       for (uint32_t i = 0; i < 1; i++) {
         // Function Probe.

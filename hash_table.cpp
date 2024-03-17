@@ -45,25 +45,23 @@ ScanStructure HashTable::Probe(Vector &join_key, int64_t count, vector<uint32_t>
 
   // gather, hash and find buckets
   for (size_t i = 0; i < count; i++) {
-    int64_t key = join_key[sel_vector[i]];
-    bucket_ids[i] = murmurhash64(key) & SCALAR_BUCKET_MASK;
+    auto key = join_key[sel_vector[i]];
+    auto bucket_idx = murmurhash64(key) & SCALAR_BUCKET_MASK;
+    ptrs[i] = linked_lists_[bucket_idx].get();
   }
 
   CycleProfiler::Get().End(0);
 
   size_t n_non_empty = 0;
   for (size_t i = 0; i < count; ++i) {
-    ptrs[i] = linked_lists_[bucket_ids[i]].get();
     if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
   }
 
   auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, sel_vector);
-
   return ret;
 }
 
 uint32_t ScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) {
-
   vector<uint32_t> result_vector(kBlockSize);
   size_t result_count = Match(join_key, result_vector);
 
@@ -145,24 +143,24 @@ ScanStructure HashTable::SIMDProbe(Vector &join_key, int64_t count, vector<uint3
     auto keys = _mm512_i32gather_epi64(indices, join_key.data_->data(), 8);
     __m512i hashes = mm512_murmurhash64(keys);
     __m512i bucket_indices = _mm512_and_si512(hashes, SIMD_BUCKET_MASK);
-    _mm512_storeu_epi64(bucket_ids.data() + i, bucket_indices);
+    __m512i address = _mm512_i64gather_epi64(bucket_indices, linked_lists_.data(), 8);
+    _mm512_storeu_epi64(ptrs.data() + i, address);
   }
 
   for (size_t i = count - tail; i < count; i++) {
     int64_t key = join_key[sel_vector[i]];
-    bucket_ids[i] = murmurhash64(key) & SCALAR_BUCKET_MASK;
+    auto bucket_idx = murmurhash64(key) & SCALAR_BUCKET_MASK;
+    ptrs[i] = linked_lists_[bucket_idx].get();
   }
 
   CycleProfiler::Get().End(0);
 
   size_t n_non_empty = 0;
   for (size_t i = 0; i < count; ++i) {
-    ptrs[i] = linked_lists_[bucket_ids[i]].get();
     if (!ptrs[i]->empty()) ptrs_sel_vector[n_non_empty++] = i;
   }
 
   auto ret = ScanStructure(n_non_empty, ptrs_sel_vector, ptrs, sel_vector);
-
   return ret;
 }
 

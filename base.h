@@ -58,7 +58,6 @@ enum class AttributeType : uint8_t { INTEGER = 0, INVALID = 3 };
 class Vector {
  public:
   AttributeType type_;
-
   shared_ptr<vector<Attribute>> data_;
 
   Vector() : type_(AttributeType::INTEGER), data_(std::make_shared<vector<Attribute>>(kBlockSize)) {}
