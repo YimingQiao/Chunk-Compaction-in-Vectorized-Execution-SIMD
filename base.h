@@ -19,6 +19,7 @@
 #include <vector>
 
 namespace simd_compaction {
+const static __m512i ALL_NEG_ONE = _mm512_set1_epi64(-1);
 const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
 const static __m512i ALL_ONE = _mm512_set1_epi64(1);
 const static __m512i ALL_EIGHT = _mm512_set1_epi64(8);
@@ -32,13 +33,13 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-constexpr uint64_t kScale = 15;
+constexpr uint64_t kScale = 0;
 
 // work set = left data chunk (block) + right hash table
 constexpr size_t kBlockSize = 256 << kScale;
 constexpr uint64_t kRHSTuples = 128 << kScale;
 constexpr uint64_t kLHSTuples = 1024 << 15;
-constexpr uint64_t kHitFreq = 4;
+constexpr uint64_t kHitFreq = 1;
 
 // query setting
 constexpr size_t kJoins = 3;

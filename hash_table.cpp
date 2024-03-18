@@ -125,9 +125,9 @@ size_t ScanStructure::ScanInnerJoin(Vector &join_key, vector<uint32_t> &result_v
       auto &r_key = (*iterators_[idx])[0];
 
       // remove branch prediction
-      //      result_vector[result_count] = idx;
-      //    result_count += (l_key == r_key);
-      if (l_key == r_key) result_vector[result_count++] = idx;
+      result_vector[result_count] = idx;
+      result_count += (l_key == r_key);
+      // if (l_key == r_key) result_vector[result_count++] = idx;
 
       // Force a memory fence after each operation
       // std::atomic_thread_fence(std::memory_order_seq_cst);
@@ -151,9 +151,9 @@ void ScanStructure::AdvancePointers() {
     auto idx = bucket_sel_vector_[i];
 
     // remove branch prediction
-    //    bucket_sel_vector_[new_count] = idx;
-    //    new_count += (++iterators_[idx] != iterator_ends_[idx]);
-    if (++iterators_[idx] != iterator_ends_[idx]) bucket_sel_vector_[new_count++] = idx;
+    bucket_sel_vector_[new_count] = idx;
+    new_count += (++iterators_[idx] != iterator_ends_[idx]);
+    // if (++iterators_[idx] != iterator_ends_[idx]) bucket_sel_vector_[new_count++] = idx;
 
     // Force a memory fence after each operation
     // std::atomic_thread_fence(std::memory_order_seq_cst);

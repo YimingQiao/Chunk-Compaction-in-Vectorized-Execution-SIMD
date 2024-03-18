@@ -21,10 +21,14 @@ add_executable(compaction
 
 # Scalar code, w/ -march=native
 add_executable(scalar_hash_native scalar_simd_main.cpp base.cpp hash_table.cpp
-        hash_functions.h)
+        hash_functions.h
+        linear_probing_hash_table.cpp
+        linear_probing_hash_table.h)
 target_compile_options(scalar_hash_native PRIVATE -march=native -funroll-loops)
 
 # Scalar code, w/o -march=native
 add_executable(scalar_hash scalar_simd_main.cpp base.cpp hash_table.cpp
-        hash_functions.h)
+        hash_functions.h
+        linear_probing_hash_table.cpp
+        linear_probing_hash_table.h)
 target_compile_options(scalar_hash PRIVATE -funroll-loops -mavx512f -mavx512dq -mavx512vl)
