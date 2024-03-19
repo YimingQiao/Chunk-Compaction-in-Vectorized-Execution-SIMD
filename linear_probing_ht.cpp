@@ -60,6 +60,9 @@ LPScanStructure LPHashTable::Probe(Vector &join_key) {
 }
 
 size_t LPScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &result) {
+  // reset the result chunk
+  result.Reset();
+
   vector<uint32_t> result_vector(kBlockSize);
   size_t result_count = 0;
 
@@ -89,7 +92,8 @@ size_t LPScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &resu
     auto &r_payload = slots_[slot_ids_[idx]];
     cols[1]->GetValue(i + cols[1]->count_) = r_payload;
   }
-  cols[1]->count_ += result_count;
+  cols[0]->count_ += result_count;
+  cols[1]->count_ = cols[0]->count_;
 
   CycleProfiler::Get().End(2);
   CycleProfiler::Get().Start();
@@ -113,6 +117,9 @@ size_t LPScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &resu
 }
 
 size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk &result) {
+  // reset the result chunk
+  result.Reset();
+
   size_t n_start_tuple = result.count_;
   size_t new_count = 0;
 
@@ -126,7 +133,8 @@ size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk 
 
     auto &col = *cols[1];
     col.GetValue(col.count_) = r_key;
-    col.count_ += (l_key == r_key);
+    cols[0]->count_ += (l_key == r_key);
+    cols[1]->count_ = cols[0]->count_;
 
     auto id = (slot_ids_[idx] + 1) & SCALAR_SLOT_MASK;
     slot_ids_[idx] = id;
@@ -176,6 +184,9 @@ LPScanStructure LPHashTable::SIMDProbe(Vector &join_key) {
 }
 
 size_t LPScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result) {
+  // reset the result chunk
+  result.Reset();
+
   vector<uint32_t> result_vector(kBlockSize);
   size_t result_count = 0;
   size_t tail = count_ & 7;
@@ -185,7 +196,8 @@ size_t LPScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
   // ------------------------------------------------  Match  ------------------------------------------------
   for (size_t i = 0; i < count_ - tail; i += 8) {
     auto indices = _mm256_loadu_epi32(slot_sel_vector_.data() + i);
-    auto l_keys = _mm512_i32gather_epi64(indices, join_key.Data(), 8);
+    auto key_indices = _mm256_i32gather_epi32((int *) join_key.selection_vector_.data(), indices, 4);
+    auto l_keys = _mm512_i32gather_epi64(key_indices, join_key.Data(), 8);
 
     auto slot_ids = _mm512_i32gather_epi64(indices, slot_ids_.data(), 8);
     auto r_keys = _mm512_i64gather_epi64(slot_ids, slots_.data(), 8);
@@ -228,6 +240,7 @@ size_t LPScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
     col.GetValue(i + col.count_) = r_tuple;
   }
   cols[1]->count_ += result_count;
+  cols[0]->count_ += result_count;
 
   CycleProfiler::Get().End(2);
   CycleProfiler::Get().Start();
@@ -264,6 +277,9 @@ size_t LPScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
 }
 
 size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataChunk &result) {
+  // reset the result chunk
+  result.Reset();
+
   size_t n_start_tuple = result.count_;
   size_t tail = count_ & 7;
   size_t new_count = 0;
@@ -272,7 +288,8 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
   vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
   for (size_t i = 0; i < count_ - tail; i += 8) {
     auto indices = _mm256_loadu_epi32(slot_sel_vector_.data() + i);
-    auto l_keys = _mm512_i32gather_epi64(indices, join_key.Data(), 8);
+    auto key_indices = _mm256_i32gather_epi32((int *) join_key.selection_vector_.data(), indices, 4);
+    auto l_keys = _mm512_i32gather_epi64(key_indices, join_key.Data(), 8);
 
     auto slot_ids = _mm512_i32gather_epi64(indices, slot_ids_.data(), 8);
     auto r_keys = _mm512_i64gather_epi64(slot_ids, slots_.data(), 8);
@@ -282,6 +299,7 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     auto r_payload = _mm512_i64gather_epi64(slot_ids, slots_.data(), 8);
     _mm512_mask_storeu_epi64(cols[1]->Data() + cols[1]->count_, match, r_payload);
     cols[1]->count_ += _mm_popcnt_u32(match);
+    cols[0]->count_ = cols[1]->count_;
 
     // advance
     auto ids = _mm512_and_epi64(SIMD_SLOT_MASK, _mm512_add_epi64(slot_ids, ALL_ONE));

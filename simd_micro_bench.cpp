@@ -205,10 +205,7 @@ int main(int argc, char *argv[]) {
         auto scan_structure = hash_table.SIMDProbe(keys_block);
 
         // Function Next.
-        while (scan_structure.HasNext()) {
-          n_tuples += scan_structure.SIMDNext(keys_block, input, output);
-          output.Reset();
-        }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDNext(keys_block, input, output); }
       }
     }
 
@@ -245,10 +242,7 @@ int main(int argc, char *argv[]) {
         auto scan_structure = hash_table.Probe(keys_block);
 
         // Function Next.
-        while (scan_structure.HasNext()) {
-          n_tuples += scan_structure.Next(keys_block, input, output);
-          output.Reset();
-        }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.Next(keys_block, input, output); }
       }
     }
 
@@ -285,10 +279,7 @@ int main(int argc, char *argv[]) {
         auto scan_structure = hash_table.SIMDProbe(keys_block);
 
         // Function Next.
-        while (scan_structure.HasNext()) {
-          n_tuples += scan_structure.SIMDInOneNext(keys_block, input, output);
-          output.Reset();
-        }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.SIMDInOneNext(keys_block, input, output); }
       }
     }
 
@@ -323,10 +314,7 @@ int main(int argc, char *argv[]) {
         auto scan_structure = hash_table.Probe(keys_block);
 
         // Function Next.
-        while (scan_structure.HasNext()) {
-          n_tuples += scan_structure.InOneNext(keys_block, input, output);
-          output.Reset();
-        }
+        while (scan_structure.HasNext()) { n_tuples += scan_structure.InOneNext(keys_block, input, output); }
       }
     }
 
