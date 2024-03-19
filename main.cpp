@@ -43,15 +43,16 @@ int main(int argc, char *argv[]) {
 
   // ---------------------------------------------- Query Setting ----------------------------------------------
 
-  // create probe table: (id1, id2, ..., idn, miscellaneous)
+  // create probe table: (id1, id2, ..., idn)
   vector<AttributeType> types;
   for (size_t i = 0; i < kJoins; ++i) types.push_back(AttributeType::INTEGER);
-  types.push_back(AttributeType::INTEGER);
   simd_compaction::DataCollection table(types);
-  vector<simd_compaction::Attribute> tuple(kJoins + 1);
-  tuple[kJoins] = 0;
+  vector<simd_compaction::Attribute> tuple(kJoins);
   for (size_t i = 0; i < kLHSTupleSize; ++i) {
-    for (size_t j = 0; j < kJoins; ++j) tuple[j] = size_t(dist(gen));
+    for (size_t j = 0; j < kJoins; ++j) {
+      // tuple[j] = size_t(dist(gen));
+      tuple[j] = i;
+    }
     table.AppendTuple(tuple);
   }
 
@@ -118,9 +119,9 @@ void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollection &res
   auto &join_key = input.data_[level];
   auto &result = intermediates[level];
 
-  auto ss = hts[level]->Probe(join_key);
+  auto ss = hts[level]->SIMDProbe(join_key);
   while (ss.HasNext()) {
-    ss.Next(join_key, input, *result, kEnableLogicalCompact);
+    ss.SIMDNext(join_key, input, *result, kEnableLogicalCompact);
     ExecutePipeline(*result, state, result_table, level + 1);
   }
 }
