@@ -192,9 +192,10 @@ void ScanStructure::InOneNextInternal(Vector &join_key, DataChunk &input, DataCh
   size_t result_count = 0;
   size_t new_count = 0;
 
+  vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
+
   CycleProfiler::Get().Start();
 
-  vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
   for (size_t i = 0; i < count_; ++i) {
     size_t idx = bucket_sel_vector_[i];
     auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
@@ -209,14 +210,15 @@ void ScanStructure::InOneNextInternal(Vector &join_key, DataChunk &input, DataCh
     bucket_sel_vector_[new_count] = idx;
     new_count += (++iterators_[idx] != iterator_ends_[idx]);
   }
+
+  CycleProfiler::Get().End(1);
+
   result.Slice(input, result_vector, result_count);
 
   // update count
   cols[1]->count_ = result_count;
   cols[0]->count_ = result_count;
   count_ = new_count;
-
-  CycleProfiler::Get().End(1);
 }
 
 // --------------------------------------------  SIMD  --------------------------------------------
@@ -415,8 +417,10 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
   size_t tail = count_ & 7;
   size_t new_count = 0;
 
-  CycleProfiler::Get().Start();
   vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
+
+  CycleProfiler::Get().Start();
+  
   for (size_t i = 0; i < count_ - tail; i += 8) {
     auto indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
     auto key_indices = _mm256_i32gather_epi32((int *) key_sel_vector_.data(), indices, 4);
@@ -456,13 +460,14 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
     bucket_sel_vector_[new_count] = idx;
     new_count += (++iterators_[idx] != iterator_ends_[idx]);
   }
+
+  CycleProfiler::Get().End(1);
+
   result.Slice(input, result_vector, result_count);
 
   // update count
   cols[1]->count_ = result_count;
   cols[0]->count_ = result_count;
   count_ = new_count;
-
-  CycleProfiler::Get().End(1);
 }
 }// namespace simd_compaction

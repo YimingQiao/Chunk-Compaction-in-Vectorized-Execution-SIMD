@@ -120,7 +120,8 @@ size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk 
   // reset the result chunk
   result.Reset();
 
-  size_t n_start_tuple = result.count_;
+  vector<uint32_t> result_vector(kBlockSize);
+  size_t result_count = 0;
   size_t new_count = 0;
 
   CycleProfiler::Get().Start();
@@ -131,10 +132,9 @@ size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk 
     auto &l_key = join_key.GetValue(join_key.selection_vector_[idx]);
     auto &r_key = slots_[slot_ids_[idx]];
 
-    auto &col = *cols[1];
-    col.GetValue(col.count_) = r_key;
-    cols[0]->count_ += (l_key == r_key);
-    cols[1]->count_ = cols[0]->count_;
+    cols[1]->GetValue(cols[1]->count_ + result_count) = r_key;
+    result_vector[result_count] = idx;
+    result_count += (l_key == r_key);
 
     auto id = (slot_ids_[idx] + 1) & SCALAR_SLOT_MASK;
     slot_ids_[idx] = id;
@@ -143,12 +143,17 @@ size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk 
     slot_sel_vector_[new_count] = idx;
     new_count += (slots_[id] != -1);
   }
-  count_ = new_count;
 
   CycleProfiler::Get().End(1);
 
-  size_t n_end_tuple = cols[1]->count_;
-  return n_end_tuple - n_start_tuple;
+  result.Slice(input, result_vector, result_count);
+
+  // update count
+  cols[1]->count_ = result_count;
+  cols[0]->count_ = result_count;
+  count_ = new_count;
+
+  return result_count;
 }
 
 // --------------------------------------------  SIMD  --------------------------------------------
@@ -280,7 +285,8 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
   // reset the result chunk
   result.Reset();
 
-  size_t n_start_tuple = result.count_;
+  vector<uint32_t> result_vector(kBlockSize);
+  size_t result_count = 0;
   size_t tail = count_ & 7;
   size_t new_count = 0;
 
@@ -298,8 +304,8 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
     auto r_payload = _mm512_i64gather_epi64(slot_ids, slots_.data(), 8);
     _mm512_mask_storeu_epi64(cols[1]->Data() + cols[1]->count_, match, r_payload);
-    cols[1]->count_ += _mm_popcnt_u32(match);
-    cols[0]->count_ = cols[1]->count_;
+    _mm256_mask_compressstoreu_epi32(result_vector.data() + result_count, match, indices);
+    result_count += _mm_popcnt_u32(match);
 
     // advance
     auto ids = _mm512_and_epi64(SIMD_SLOT_MASK, _mm512_add_epi64(slot_ids, ALL_ONE));
@@ -315,9 +321,10 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     auto &l_key = join_key.GetValue(join_key.selection_vector_[idx]);
     auto &r_key = slots_[slot_ids_[idx]];
 
-    auto &col = *cols[1];
-    col.GetValue(col.count_) = r_key;
-    col.count_ += (l_key == r_key);
+    // match & gather
+    cols[1]->GetValue(cols[1]->count_ + result_count) = r_key;
+    result_vector[result_count] = idx;
+    result_count += (l_key == r_key);
 
     auto id = (slot_ids_[idx] + 1) & SCALAR_SLOT_MASK;
     slot_ids_[idx] = id;
@@ -326,10 +333,16 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     slot_sel_vector_[new_count] = idx;
     new_count += (slots_[id] != -1);
   }
-  count_ = new_count;
+
   CycleProfiler::Get().End(1);
 
-  size_t n_end_tuple = cols[1]->count_;
-  return n_end_tuple - n_start_tuple;
+  result.Slice(input, result_vector, result_count);
+
+  // update count
+  cols[1]->count_ = result_count;
+  cols[0]->count_ = result_count;
+  count_ = new_count;
+
+  return result_count;
 }
 }// namespace simd_compaction
