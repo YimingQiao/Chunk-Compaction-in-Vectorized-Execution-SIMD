@@ -31,7 +31,11 @@ class LPScanStructure {
 
   size_t Next(Vector &join_key, DataChunk &input, DataChunk &result);
 
+  size_t InOneNext(Vector &join_key, DataChunk &input, DataChunk &result);
+
   size_t SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result);
+
+  size_t SIMDInOneNext(Vector &join_key, DataChunk &input, DataChunk &result);
 
   inline bool HasNext() const { return count_ > 0; }
 

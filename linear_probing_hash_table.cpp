@@ -112,6 +112,37 @@ size_t LPScanStructure::Next(Vector &join_key, DataChunk &input, DataChunk &resu
   return result_count;
 }
 
+size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk &result) {
+  size_t n_start_tuple = result.count_;
+  size_t new_count = 0;
+
+  CycleProfiler::Get().Start();
+
+  vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
+  for (size_t i = 0; i < count_ - (count_ & 7); ++i) {
+    auto idx = slot_sel_vector_[i];
+    auto &l_key = join_key.GetValue(join_key.selection_vector_[idx]);
+    auto &r_key = slots_[slot_ids_[idx]];
+
+    auto &col = *cols[1];
+    col.GetValue(col.count_) = r_key;
+    col.count_ += (l_key == r_key);
+
+    auto id = (slot_ids_[idx] + 1) & SCALAR_SLOT_MASK;
+    slot_ids_[idx] = id;
+
+    // branch prediction
+    slot_sel_vector_[new_count] = idx;
+    new_count += (slots_[id] != -1);
+  }
+  count_ = new_count;
+
+  CycleProfiler::Get().End(1);
+
+  size_t n_end_tuple = cols[1]->count_;
+  return n_end_tuple - n_start_tuple;
+}
+
 // --------------------------------------------  SIMD  --------------------------------------------
 LPScanStructure LPHashTable::SIMDProbe(Vector &join_key) {
   vector<uint64_t> slot_ids(kBlockSize);
@@ -230,5 +261,40 @@ size_t LPScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
   CycleProfiler::Get().End(3);
 
   return result_count;
+}
+
+size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataChunk &result) {
+  size_t n_start_tuple = result.count_;
+  size_t tail = count_ & 7;
+  size_t new_count = 0;
+
+  CycleProfiler::Get().Start();
+  vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
+  for (size_t i = 0; i < count_ - tail; i += 8) {
+    auto indices = _mm256_loadu_epi32(slot_sel_vector_.data() + i);
+    auto l_keys = _mm512_i32gather_epi64(indices, join_key.Data(), 8);
+
+    auto slot_ids = _mm512_i32gather_epi64(indices, slot_ids_.data(), 8);
+    auto r_keys = _mm512_i64gather_epi64(slot_ids, slots_.data(), 8);
+
+    // match & gather
+    __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
+    auto r_payload = _mm512_i64gather_epi64(slot_ids, slots_.data(), 8);
+    _mm512_mask_storeu_epi64(cols[1]->Data() + cols[1]->count_, match, r_payload);
+    cols[1]->count_ += _mm_popcnt_u32(match);
+
+    // advance
+    auto ids = _mm512_and_epi64(SIMD_SLOT_MASK, _mm512_add_epi64(slot_ids, ALL_ONE));
+    _mm512_i32scatter_epi64(slot_ids_.data(), indices, ids, 8);
+    auto next_keys = _mm512_i64gather_epi64(ids, slots_.data(), 8);
+    __mmask8 valid = _mm512_cmpneq_epi64_mask(next_keys, ALL_NEG_ONE);
+    _mm256_mask_compressstoreu_epi32(slot_sel_vector_.data() + new_count, valid, indices);
+    new_count += _mm_popcnt_u32(valid);
+  }
+  count_ = new_count;
+  CycleProfiler::Get().End(1);
+
+  size_t n_end_tuple = cols[1]->count_;
+  return n_end_tuple - n_start_tuple;
 }
 }// namespace simd_compaction
