@@ -34,7 +34,7 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-constexpr uint64_t kScale = 0;
+constexpr uint64_t kScale = 3;
 using std::vector;
 using idx_t = size_t;
 
