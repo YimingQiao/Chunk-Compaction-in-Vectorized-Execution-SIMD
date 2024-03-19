@@ -188,6 +188,8 @@ size_t ScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk &r
 }
 
 void ScanStructure::InOneNextInternal(Vector &join_key, DataChunk &input, DataChunk &result) {
+  vector<uint32_t> result_vector(kBlockSize);
+  size_t result_count = 0;
   size_t new_count = 0;
 
   CycleProfiler::Get().Start();
@@ -199,16 +201,21 @@ void ScanStructure::InOneNextInternal(Vector &join_key, DataChunk &input, DataCh
     auto &r_key = (*iterators_[idx]);
 
     // match & gather
-    auto &col = *cols[1];
-    col.GetValue(col.count_) = r_key;
-    col.count_ += (l_key == r_key);
+    cols[1]->GetValue(cols[1]->count_ + result_count) = r_key;
+    result_vector[result_count] = idx;
+    result_count += (l_key == r_key);
 
     // advance, remove branch prediction
     bucket_sel_vector_[new_count] = idx;
     new_count += (++iterators_[idx] != iterator_ends_[idx]);
   }
+  result.Slice(input, result_vector, result_count);
+
+  // update count
+  cols[1]->count_ = result_count;
+  cols[0]->count_ = result_count;
   count_ = new_count;
-  result.count_ = cols[1]->count_;
+
   CycleProfiler::Get().End(1);
 }
 
@@ -307,6 +314,7 @@ size_t ScanStructure::SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &resu
       auto indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
       auto key_indices = _mm256_i32gather_epi32((int *) key_sel_vector_.data(), indices, 4);
       auto l_keys = _mm512_i32gather_epi64(key_indices, join_key.Data(), 8);
+
       auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
       iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
       auto r_keys = _mm512_i64gather_epi64(iterators, nullptr, 1);
@@ -402,6 +410,8 @@ size_t ScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataChun
 }
 
 void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, DataChunk &result) {
+  vector<uint32_t> result_vector(kBlockSize);
+  size_t result_count = 0;
   size_t tail = count_ & 7;
   size_t new_count = 0;
 
@@ -419,8 +429,9 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
     // match & gather
     __mmask8 match = _mm512_cmpeq_epi64_mask(l_keys, r_keys);
     auto r_payload = _mm512_i64gather_epi64(node, nullptr, 1);
-    _mm512_mask_storeu_epi64(cols[1]->Data() + cols[1]->count_, match, r_payload);
-    cols[1]->count_ += _mm_popcnt_u32(match);
+    _mm512_mask_storeu_epi64(cols[1]->Data() + cols[1]->count_ + result_count, match, r_payload);
+    _mm256_mask_compressstoreu_epi32(result_vector.data() + result_count, match, indices);
+    result_count += _mm_popcnt_u32(match);
 
     // advance
     auto next_its = _mm512_i64gather_epi64(iterators, nullptr, 1);
@@ -431,23 +442,27 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
     new_count += _mm_popcnt_u32(valid);
   }
 
-  for (size_t i = count_ - tail; i < count_; i++) {
+  for (size_t i = count_ - tail; i < count_; ++i) {
     size_t idx = bucket_sel_vector_[i];
     auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
     auto &r_key = (*iterators_[idx]);
 
     // match & gather
-    auto &col = *cols[1];
-    col.GetValue(col.count_) = r_key;
-    col.count_ += (l_key == r_key);
+    cols[1]->GetValue(cols[1]->count_ + result_count) = r_key;
+    result_vector[result_count] = idx;
+    result_count += (l_key == r_key);
 
     // advance, remove branch prediction
     bucket_sel_vector_[new_count] = idx;
     new_count += (++iterators_[idx] != iterator_ends_[idx]);
   }
+  result.Slice(input, result_vector, result_count);
 
+  // update count
+  cols[1]->count_ = result_count;
+  cols[0]->count_ = result_count;
   count_ = new_count;
-  result.count_ = cols[1]->count_;
+
   CycleProfiler::Get().End(1);
 }
 }// namespace simd_compaction

@@ -121,7 +121,7 @@ void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollection &res
 
   auto ss = hts[level]->SIMDProbe(join_key);
   while (ss.HasNext()) {
-    ss.SIMDNext(join_key, input, *result, kEnableLogicalCompact);
+    ss.SIMDInOneNext(join_key, input, *result, kEnableLogicalCompact);
     ExecutePipeline(*result, state, result_table, level + 1);
   }
 }
