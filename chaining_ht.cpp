@@ -191,6 +191,7 @@ void ScanStructure::InOneNextInternal(Vector &join_key, DataChunk &input, DataCh
   vector<uint32_t> result_vector(kBlockSize);
   size_t result_count = 0;
   size_t new_count = 0;
+  size_t base = result.count_;
 
   vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
 
@@ -202,7 +203,7 @@ void ScanStructure::InOneNextInternal(Vector &join_key, DataChunk &input, DataCh
     auto &r_key = (*iterators_[idx]);
 
     // match & gather
-    cols[1]->GetValue(cols[1]->count_ + result_count) = r_key;
+    cols[1]->GetValue(base + result_count) = r_key;
     result_vector[result_count] = idx;
     result_count += (l_key == r_key);
 
@@ -446,6 +447,8 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
     new_count += _mm_popcnt_u32(valid);
   }
 
+  CycleProfiler::Get().End(1);
+
   for (size_t i = count_ - tail; i < count_; ++i) {
     size_t idx = bucket_sel_vector_[i];
     auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
@@ -460,8 +463,6 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
     bucket_sel_vector_[new_count] = idx;
     new_count += (++iterators_[idx] != iterator_ends_[idx]);
   }
-
-  CycleProfiler::Get().End(1);
 
   result.Slice(input, result_vector, result_count);
 
