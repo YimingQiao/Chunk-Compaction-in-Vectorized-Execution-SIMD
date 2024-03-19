@@ -9,14 +9,11 @@
 
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <list>
 #include <unordered_map>
 #include <utility>
-// An 'atomic_thread_fence' provides a stronger guarantee of memory ordering than the
-// one provided by individual atomic operations and can be used to synchronize memory
-// accesses to non-atomic variables.
-#include <atomic>
 
 #include "base.h"
 #include "hash_functions.h"
@@ -44,9 +41,9 @@ class ScanStructure {
     }
   }
 
-  size_t Next(Vector &join_key, DataChunk &input, DataChunk &result, bool compact_mode = true);
+  size_t Next(Vector &join_key, DataChunk &input, DataChunk &result);
 
-  size_t InOneNext(Vector &join_key, DataChunk &input, DataChunk &result, bool compact_mode = false);
+  size_t InOneNext(Vector &join_key, DataChunk &input, DataChunk &result);
 
   inline bool HasNext() const { return HasBucket() || HasBuffer(); }
 
@@ -72,10 +69,6 @@ class ScanStructure {
 
   inline void GatherResult(vector<Vector *> cols, vector<uint32_t> &result_vector, size_t count);
 
-  void NextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
-
-  void InOneNextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
-
   // ----------------------------  SIMD  ----------------------------
  public:
   size_t SIMDNext(Vector &join_key, DataChunk &input, DataChunk &result, bool compact_mode = true);
@@ -83,24 +76,20 @@ class ScanStructure {
   size_t SIMDInOneNext(Vector &join_key, DataChunk &input, DataChunk &result, bool compact_mode = false);
 
  private:
-  void SIMDNextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
-
   size_t SIMDScanInnerJoin(Vector &join_key, vector<uint32_t> &result_vector);
 
   inline void SIMDAdvancePointers();
 
-  inline void SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, size_t count);
-
-  void SIMDInOneNextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
+  inline void SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &result_vector, size_t count);
 };
 
 class HashTable {
  public:
   HashTable(size_t n_rhs_tuples, size_t chunk_factor);
 
-  ScanStructure Probe(Vector &join_key);
+  ScanStructure Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vec);
 
-  ScanStructure SIMDProbe(Vector &join_key);
+  ScanStructure SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vec);
 
  private:
   size_t n_buckets_;

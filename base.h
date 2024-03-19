@@ -14,11 +14,10 @@
 #include <iostream>
 #include <list>
 #include <memory>
+#include <string>
 #include <unordered_map>
 #include <variant>
 #include <vector>
-
-namespace simd_compaction {
 
 namespace simd_compaction {
 const static __m512i ALL_NEG_ONE = _mm512_set1_epi64(-1);
@@ -35,7 +34,7 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-constexpr uint64_t kScale = 7;
+constexpr uint64_t kScale = 0;
 using std::vector;
 using idx_t = size_t;
 
@@ -70,8 +69,6 @@ class Vector {
   inline void Reference(Vector &other);
 
   Attribute &GetValue(size_t idx) { return (*data_)[idx]; }
-
-  inline void Reset() { count_ = 0; }
 
   inline auto *Data() { return data_->data(); }
 

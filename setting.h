@@ -28,5 +28,5 @@ using Compactor = NaiveCompactor;
 const string strategy_name = "no_compaction";
 #endif
 
-const bool flag_collect_tuples = false;
+const bool flag_collect_tuples = true;
 }// namespace simd_compaction
