@@ -351,6 +351,8 @@ size_t ScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataChun
     new_count += _mm_popcnt_u32(valid);
   }
 
+  CycleProfiler::Get().End(1);
+
   for (size_t i = count_ - tail; i < count_; ++i) {
     size_t idx = bucket_sel_vector_[i];
     auto &l_key = join_key.GetValue(key_sel_vector_[idx]);
@@ -365,8 +367,6 @@ size_t ScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataChun
     bucket_sel_vector_[new_count] = idx;
     new_count += (++iterators_[idx] != iterator_ends_[idx]);
   }
-
-  CycleProfiler::Get().End(1);
 
   result.Slice(input, result_vector, result_count);
 
