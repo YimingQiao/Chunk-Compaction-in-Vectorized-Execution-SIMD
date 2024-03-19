@@ -33,7 +33,7 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-constexpr uint64_t kScale = 7;
+constexpr uint64_t kScale = 0;
 
 // work set = left data chunk (block) + right hash table
 constexpr size_t kBlockSize = 256 << kScale;
