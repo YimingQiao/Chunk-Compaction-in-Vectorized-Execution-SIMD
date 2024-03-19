@@ -23,8 +23,10 @@ using Key = int64_t;
 
 class LPScanStructure {
  public:
-  LPScanStructure(size_t count, vector<uint64_t> slot_ids, vector<uint32_t> slot_sel_vector, vector<Key> &slots)
-      : count_(count), slot_ids_(std::move(slot_ids)), slot_sel_vector_(std::move(slot_sel_vector)), slots_(slots) {
+  LPScanStructure(size_t count, vector<uint64_t> slot_ids, vector<uint32_t> slot_sel_vector, vector<Key> &slots,
+                  vector<uint32_t> &key_sel_vector)
+      : count_(count), slot_ids_(std::move(slot_ids)), slot_sel_vector_(std::move(slot_sel_vector)), slots_(slots),
+        key_sel_vector_(key_sel_vector) {
     SCALAR_SLOT_MASK = slots_.size() - 1;
     SIMD_SLOT_MASK = SIMD_SLOT_MASK = _mm512_set1_epi64(slots_.size() - 1);
   }
@@ -43,6 +45,7 @@ class LPScanStructure {
   size_t count_;
   vector<uint64_t> slot_ids_;
   vector<uint32_t> slot_sel_vector_;
+  vector<uint32_t> key_sel_vector_;
   vector<Key> &slots_;
 
   // we use & mask to replace % n.
@@ -54,9 +57,9 @@ class LPHashTable {
  public:
   LPHashTable(size_t n_rhs_tuples, size_t chunk_factor);
 
-  LPScanStructure Probe(Vector &join_key);
+  LPScanStructure Probe(Vector &join_key, size_t count, vector<uint32_t> &sel_vec);
 
-  LPScanStructure SIMDProbe(Vector &join_key);
+  LPScanStructure SIMDProbe(Vector &join_key, size_t count, vector<uint32_t> &sel_vec);
 
  private:
   // All empty slots have the value -1.

@@ -27,7 +27,7 @@ endif ()
 add_executable(simd_compaction main.cpp profiler.h base.cpp chaining_ht.cpp data_collection.cpp compactor.cpp negative_feedback.hpp)
 target_compile_options(simd_compaction PRIVATE -march=native -funroll-loops)
 
-add_executable(simd_bench simd_micro_bench.cpp base.cpp chaining_ht.cpp)
+add_executable(simd_bench simd_micro_bench.cpp base.cpp chaining_ht.cpp linear_probing_ht.cpp)
 target_compile_options(simd_bench PRIVATE -funroll-loops -mavx512f -mavx512dq -mavx512vl -march=native)
 
 

@@ -300,9 +300,9 @@ void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &re
     __m256i indices = _mm256_loadu_epi32(result_vector.data() + i);
     auto iterators = _mm512_i32gather_epi64(indices, iterators_.data(), 8);
     iterators = _mm512_add_epi64(iterators, ALL_SIXTEEN);
-    auto keys = _mm512_i64gather_epi64(iterators, nullptr, 1);
+    auto payloads = _mm512_i64gather_epi64(iterators, nullptr, 1);
     __m256i poss = _mm256_i32gather_epi32((int *) key_sel_vector_.data(), indices, 4);
-    _mm512_i32scatter_epi64(col.Data(), poss, keys, 8);
+    _mm512_i32scatter_epi64(col.Data(), poss, payloads, 8);
   }
 
   for (size_t i = count - tail; i < count; i++) {
