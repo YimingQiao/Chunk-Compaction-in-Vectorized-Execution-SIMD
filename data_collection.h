@@ -31,4 +31,4 @@ class DataCollection {
   size_t n_tuples_;
   vector<vector<Attribute>> collection_;
 };
-}
+}// namespace simd_compaction

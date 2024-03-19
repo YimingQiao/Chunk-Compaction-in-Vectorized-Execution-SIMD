@@ -2,10 +2,10 @@
 #include <random>
 
 #include "base.h"
-#include "hash_table.h"
+#include "chaining_ht.h"
+#include "compactor.h"
 #include "data_collection.h"
 #include "profiler.h"
-#include "compactor.h"
 #include "setting.h"
 
 using namespace simd_compaction;
@@ -23,12 +23,10 @@ static void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollecti
 void FlushPipelineCache(PipelineState &state, DataCollection &result_table, size_t level);
 
 std::vector<size_t> ParseList(const std::string &s) {
-  std::stringstream ss(s.substr(1, s.size() - 2)); // Ignore brackets
+  std::stringstream ss(s.substr(1, s.size() - 2));// Ignore brackets
   std::vector<size_t> result;
   std::string item;
-  while (std::getline(ss, item, ',')) {
-    result.push_back(std::stoi(item));
-  }
+  while (std::getline(ss, item, ',')) { result.push_back(std::stoi(item)); }
   return result;
 }
 
@@ -48,10 +46,10 @@ int main(int argc, char *argv[]) {
   // create probe table: (id1, id2, ..., idn, miscellaneous)
   vector<AttributeType> types;
   for (size_t i = 0; i < kJoins; ++i) types.push_back(AttributeType::INTEGER);
-  types.push_back(AttributeType::STRING);
+  types.push_back(AttributeType::INTEGER);
   simd_compaction::DataCollection table(types);
   vector<simd_compaction::Attribute> tuple(kJoins + 1);
-  tuple[kJoins] = "|";
+  tuple[kJoins] = 0;
   for (size_t i = 0; i < kLHSTupleSize; ++i) {
     for (size_t j = 0; j < kJoins; ++j) tuple[j] = size_t(dist(gen));
     table.AppendTuple(tuple);
@@ -63,9 +61,9 @@ int main(int argc, char *argv[]) {
   auto &intermediates = state.intermediates;
   auto &compactors = state.compactors;
   for (size_t i = 0; i < kJoins; ++i) {
-    hts[i] = std::make_unique<HashTable>(kRHSTupleSize, kChunkFactor, kRHSPayLoadLength[i]);
+    hts[i] = std::make_unique<HashTable>(kRHSTupleSize, kChunkFactor);
     types.push_back(AttributeType::INTEGER);
-    types.push_back(AttributeType::STRING);
+    types.push_back(AttributeType::INTEGER);
     intermediates[i] = std::make_unique<DataChunk>(types);
     compactors[i] = std::make_unique<NaiveCompactor>(types);
   }
@@ -90,15 +88,6 @@ int main(int argc, char *argv[]) {
       ExecutePipeline(chunk, state, result_table, 0);
       latency += timer.Elapsed();
     } while (end < kLHSTupleSize);
-
-#ifdef flag_full_compact
-    timer.Start();
-    {
-      // Flush the tuples in cache.
-      FlushPipelineCache(state, result_table, 0);
-    }
-    latency += timer.Elapsed();
-#endif
   }
 
   std::cerr << "------------------ Statistic ------------------\n";
@@ -128,18 +117,10 @@ void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollection &res
 
   auto &join_key = input.data_[level];
   auto &result = intermediates[level];
-  auto &compactor = compactors[level];
 
   auto ss = hts[level]->Probe(join_key);
   while (ss.HasNext()) {
     ss.Next(join_key, input, *result, kEnableLogicalCompact);
-
-#ifdef flag_full_compact
-    // A compactor sits here.
-    compactor->Compact(result);
-    if (result->count_ == 0) continue;
-#endif
-
     ExecutePipeline(*result, state, result_table, level + 1);
   }
 }
@@ -190,28 +171,18 @@ void ParseParameters(int argc, char **argv) {
           kRHSTupleSize = std::stoi(argv[i + 1]);
           i++;
         }
-      } else if (arg.substr(0, 16) == "--payload-length") {
-        // --payload-length=[0,1000,0,0]
-        kRHSPayLoadLength = ParseList(arg.substr(17));
       }
     }
-
-    if (kJoins != kRHSPayLoadLength.size())
-      throw std::runtime_error("Payload vector length must equal to the number of joins.");
   }
 
   // show the setting
   std::cerr << "------------------ Setting ------------------\n";
   if (kEnableLogicalCompact) std::cerr << "Strategy: logical_compaction\n";
-  else std::cerr << "Compaction Strategy: no_compaction\n";
+  else
+    std::cerr << "Compaction Strategy: no_compaction\n";
+
   std::cerr << "Number of Joins: " << kJoins << "\n"
             << "Number of LHS Tuple: " << kLHSTupleSize << "\n"
             << "Number of RHS Tuple: " << kRHSTupleSize << "\n"
             << "Chunk Factor: " << kChunkFactor << "\n";
-  std::cerr << "RHS Payload Lengths: [";
-  for (size_t i = 0; i < kJoins; ++i) {
-    if (i != kJoins - 1) std::cerr << kRHSPayLoadLength[i] << ",";
-    else std::cerr << kRHSPayLoadLength[i] << "]\n";
-  }
 }
-

@@ -42,11 +42,10 @@ constexpr uint64_t kLHSTuples = 1024 << 15;
 constexpr uint64_t kHitFreq = 1;
 
 // query setting
-constexpr size_t kJoins = 3;
-constexpr size_t kLHSTupleSize = 2e7;
-constexpr size_t kRHSTupleSize = 2e6;
-constexpr size_t kChunkFactor = 1;
-static vector<size_t> kRHSPayLoadLength{0, 0, 0, 0};
+static size_t kJoins = 1;
+static size_t kLHSTupleSize = 2e7;
+static size_t kRHSTupleSize = 2e6;
+static size_t kChunkFactor = 1;
 
 // Attribute includes three types: integer, float-point number, and the string.
 using Attribute = int64_t;

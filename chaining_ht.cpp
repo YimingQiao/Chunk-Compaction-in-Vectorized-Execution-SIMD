@@ -1,4 +1,4 @@
-#include "hash_table.h"
+#include "chaining_ht.h"
 
 namespace simd_compaction {
 HashTable::HashTable(size_t n_rhs_tuples, size_t chunk_factor) {

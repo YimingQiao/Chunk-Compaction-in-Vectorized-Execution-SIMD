@@ -13,5 +13,5 @@
 namespace simd_compaction {
 constexpr bool kEnableLogicalCompact = false;
 
-bool flag_collect_tuples = false;
+bool flag_collect_tuples = true;
 }// namespace simd_compaction

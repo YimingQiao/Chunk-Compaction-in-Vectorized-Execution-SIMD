@@ -24,9 +24,7 @@ void simd_compaction::DataCollection::AppendChunk(simd_compaction::DataChunk &ch
 
 simd_compaction::DataChunk simd_compaction::DataCollection::FetchChunk(size_t start, size_t end) {
   DataChunk chunk(types_);
-  for (size_t i = start; i < end; ++i) {
-    chunk.AppendTuple(collection_[i]);
-  }
+  for (size_t i = start; i < end; ++i) { chunk.AppendTuple(collection_[i]); }
   return chunk;
 }
 
@@ -38,21 +36,13 @@ void simd_compaction::DataCollection::Print(size_t n_tuple) {
     for (size_t j = 0; j < tuple.size(); ++j) {
       switch (types_[j]) {
         case AttributeType::INTEGER: {
-          std::cout << std::get<size_t>(tuple[j]) << ", ";
+          std::cout << tuple[j] << ", ";
           break;
         }
-        case AttributeType::DOUBLE: {
-          std::cout << std::get<double>(tuple[j]) << ", ";
-          break;
-        }
-        case AttributeType::STRING: {
-          std::cout << std::get<std::string>(tuple[j]) << ", ";
-          break;
-        }
-        case AttributeType::INVALID:break;
+        case AttributeType::INVALID: break;
       }
     }
     std::cout << "\n";
   }
 }
-}
+}// namespace simd_compaction

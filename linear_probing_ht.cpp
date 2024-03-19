@@ -1,4 +1,4 @@
-#include "linear_probing_hash_table.h"
+#include "linear_probing_ht.h"
 
 namespace simd_compaction {
 simd_compaction::LPHashTable::LPHashTable(size_t n_rhs_tuples, size_t chunk_factor) {

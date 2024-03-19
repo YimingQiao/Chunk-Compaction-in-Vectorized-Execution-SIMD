@@ -3,8 +3,8 @@
 #include <vector>
 
 #include "base.h"
-#include "hash_table.h"
-#include "linear_probing_hash_table.h"
+#include "chaining_ht.h"
+#include "linear_probing_ht.h"
 #include "setting.h"
 
 using namespace simd_compaction;
