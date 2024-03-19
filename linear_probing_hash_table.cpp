@@ -31,7 +31,7 @@ simd_compaction::LPHashTable::LPHashTable(size_t n_rhs_tuples, size_t chunk_fact
     auto slot_id = murmurhash64(value) & SCALAR_SLOT_MASK;
 
     // find an empty slot
-    while (!slots_[slot_id] == -1) { slot_id = (slot_id + 1) & SCALAR_SLOT_MASK; }
+    while (slots_[slot_id] != -1) { slot_id = (slot_id + 1) & SCALAR_SLOT_MASK; }
     slots_[slot_id] = tuple[0];
   }
 }
@@ -119,7 +119,7 @@ size_t LPScanStructure::InOneNext(Vector &join_key, DataChunk &input, DataChunk 
   CycleProfiler::Get().Start();
 
   vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
-  for (size_t i = 0; i < count_ - (count_ & 7); ++i) {
+  for (size_t i = 0; i < count_; ++i) {
     auto idx = slot_sel_vector_[i];
     auto &l_key = join_key.GetValue(join_key.selection_vector_[idx]);
     auto &r_key = slots_[slot_ids_[idx]];
@@ -183,7 +183,7 @@ size_t LPScanStructure::SIMDNext(Vector &join_key, DataChunk &input, DataChunk &
   CycleProfiler::Get().Start();
 
   // ------------------------------------------------  Match  ------------------------------------------------
-  for (size_t i = 0; i < count_; i += 8) {
+  for (size_t i = 0; i < count_ - tail; i += 8) {
     auto indices = _mm256_loadu_epi32(slot_sel_vector_.data() + i);
     auto l_keys = _mm512_i32gather_epi64(indices, join_key.Data(), 8);
 
@@ -290,6 +290,23 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     __mmask8 valid = _mm512_cmpneq_epi64_mask(next_keys, ALL_NEG_ONE);
     _mm256_mask_compressstoreu_epi32(slot_sel_vector_.data() + new_count, valid, indices);
     new_count += _mm_popcnt_u32(valid);
+  }
+
+  for (size_t i = count_ - tail; i < count_; i++) {
+    auto idx = slot_sel_vector_[i];
+    auto &l_key = join_key.GetValue(join_key.selection_vector_[idx]);
+    auto &r_key = slots_[slot_ids_[idx]];
+
+    auto &col = *cols[1];
+    col.GetValue(col.count_) = r_key;
+    col.count_ += (l_key == r_key);
+
+    auto id = (slot_ids_[idx] + 1) & SCALAR_SLOT_MASK;
+    slot_ids_[idx] = id;
+
+    // branch prediction
+    slot_sel_vector_[new_count] = idx;
+    new_count += (slots_[id] != -1);
   }
   count_ = new_count;
   CycleProfiler::Get().End(1);
