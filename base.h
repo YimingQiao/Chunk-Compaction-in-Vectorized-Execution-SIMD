@@ -46,8 +46,8 @@ constexpr uint64_t kHitFreq = 1;
 
 // query setting
 static size_t kJoins = 3;
-static size_t kLHSTupleSize = 8;
-static size_t kRHSTupleSize = 4;
+static size_t kLHSTupleSize = 2e7;
+static size_t kRHSTupleSize = 2e6;
 static size_t kChunkFactor = 2;
 
 // Attribute includes three types: integer, float-point number, and the string.

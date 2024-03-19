@@ -50,10 +50,7 @@ int main(int argc, char *argv[]) {
   simd_compaction::DataCollection table(types);
   vector<simd_compaction::Attribute> tuple(kJoins);
   for (size_t i = 0; i < kLHSTupleSize; ++i) {
-    for (size_t j = 0; j < kJoins; ++j) {
-      // tuple[j] = size_t(dist(gen));
-      tuple[j] = i;
-    }
+    for (size_t j = 0; j < kJoins; ++j) { tuple[j] = size_t(dist(gen)); }
     table.AppendTuple(tuple);
   }
 
