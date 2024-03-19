@@ -1,12 +1,12 @@
-#include <cstring>
 #include <iostream>
 #include <random>
 
 #include "base.h"
+#include "chaining_ht.h"
 #include "compactor.h"
 #include "data_collection.h"
-#include "hash_table.h"
 #include "profiler.h"
+#include "compactor.h"
 #include "setting.h"
 
 using namespace simd_compaction;
@@ -23,7 +23,13 @@ static void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollecti
 
 void FlushPipelineCache(PipelineState &state, DataCollection &result_table, size_t level);
 
-std::vector<size_t> ParseList(const std::string &s);
+std::vector<size_t> ParseList(const std::string &s) {
+  std::stringstream ss(s.substr(1, s.size() - 2));// Ignore brackets
+  std::vector<size_t> result;
+  std::string item;
+  while (std::getline(ss, item, ',')) { result.push_back(std::stoi(item)); }
+  return result;
+}
 
 void ParseParameters(int argc, char *argv[]);
 
@@ -38,15 +44,16 @@ int main(int argc, char *argv[]) {
 
   // ---------------------------------------------- Query Setting ----------------------------------------------
 
-  // create probe table: (id1, id2, ..., idn, miscellaneous)
+  // create probe table: (id1, id2, ..., idn)
   vector<AttributeType> types;
   for (size_t i = 0; i < kJoins; ++i) types.push_back(AttributeType::INTEGER);
-  types.push_back(AttributeType::INTEGER);
   simd_compaction::DataCollection table(types);
-  vector<simd_compaction::Attribute> tuple(kJoins + 1);
-  tuple[kJoins] = size_t(9999999);
+  vector<simd_compaction::Attribute> tuple(kJoins);
   for (size_t i = 0; i < kLHSTupleSize; ++i) {
-    for (size_t j = 0; j < kJoins; ++j) tuple[j] = size_t(dist(gen));
+    for (size_t j = 0; j < kJoins; ++j) {
+      // tuple[j] = size_t(dist(gen));
+      tuple[j] = i;
+    }
     table.AppendTuple(tuple);
   }
 
@@ -223,12 +230,4 @@ void ParseParameters(int argc, char **argv) {
             << "Number of LHS Tuple: " << kLHSTupleSize << "\n"
             << "Number of RHS Tuple: " << kRHSTupleSize << "\n"
             << "Chunk Factor: " << kChunkFactor << "\n";
-}
-
-std::vector<size_t> ParseList(const string &s) {
-  std::stringstream ss(s.substr(1, s.size() - 2));// Ignore brackets
-  std::vector<size_t> result;
-  std::string item;
-  while (std::getline(ss, item, ',')) { result.push_back(std::stoi(item)); }
-  return result;
 }

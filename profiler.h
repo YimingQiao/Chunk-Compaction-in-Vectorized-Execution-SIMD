@@ -1,5 +1,5 @@
 //===----------------------------------------------------------------------===//
-//                         SIMD Compaction
+//                         Compaction
 //
 // profiler.h
 //
@@ -16,10 +16,6 @@
 #include <iostream>
 #include <mutex>
 #include <random>
-#include <unordered_map>
-#include <vector>
-
-#include "base.h"
 
 namespace simd_compaction {
 using std::atomic;
@@ -62,7 +58,7 @@ using Profiler = BaseProfiler<system_clock>;
 
 class BeeProfiler {
  public:
-  const static bool kEnableProfiling = true;
+  const static bool kEnableProfiling = 1;
 
  public:
   static BeeProfiler &Get() {
@@ -99,19 +95,24 @@ class BeeProfiler {
 
     // -------------------------------- Print Timing Results --------------------------------
     std::vector<std::string> keys;
-    for (const auto &pair : values_) { keys.push_back(pair.first); }
+    for (const auto &pair : values_) keys.push_back(pair.first);
+
     if (!keys.empty()) {
       std::sort(keys.begin(), keys.end());
+
       std::cerr << "-------\n";
       for (const auto &key : keys) {
-        if (key.find("TableScan") != std::string::npos && key.find("in_mem") == std::string::npos) { continue; }
-        if (key.find("#Tuple") != std::string::npos) { continue; }
+        if (key.find("TableScan") != std::string::npos && key.find("in_mem") == std::string::npos) continue;
+
+        if (key.find("#Tuple") != std::string::npos) continue;
+
         double time = values_.at(key) / double(1e9);
         size_t calling_times = calling_times_.at(key);
         double avg = time / calling_times;
 
         std::cerr << "Total: " << time << " s\tCalls: " << calling_times << "\tAvg: " << avg << " s\t" << key << '\n';
       }
+
       std::cerr << "-------\n";
       for (const auto &key : keys) {
         if (key.find("#Tuple") != std::string::npos) {
@@ -256,5 +257,35 @@ class ZebraProfiler {
   std::random_device rd;
   std::mt19937 gen_;
   std::uniform_int_distribution<int> integers;
+};
+
+class CycleProfiler {
+ public:
+  static CycleProfiler &Get() {
+    static CycleProfiler instance;
+    return instance;
+  }
+
+  inline void Start() { start_cycle_ = __rdtsc(); }
+
+  inline void End(uint32_t id) {
+    end_cycle_ = __rdtsc();
+    tables_[id] += end_cycle_ - start_cycle_;
+  }
+
+  inline void Init() { std::fill(tables_.begin(), tables_.end(), 0); }
+
+  inline uint64_t Data(uint32_t id) { return tables_[id]; }
+
+ private:
+  CycleProfiler() : start_cycle_(0), end_cycle_(0), tables_(4, 0){};
+
+  uint64_t start_cycle_;
+  uint64_t end_cycle_;
+  // 0: hash & find buckets
+  // 1: Compare join keys
+  // 2: Gather matched tuples
+  // 3: Advance iterators
+  std::vector<uint64_t> tables_;
 };
 }// namespace simd_compaction

@@ -34,7 +34,7 @@ void simd_compaction::DataCollection::Print(size_t n_tuple) {
     for (size_t j = 0; j < tuple.size(); ++j) {
       switch (types_[j]) {
         case AttributeType::INTEGER: {
-          std::cout << (tuple[j]) << ", ";
+          std::cout << tuple[j] << ", ";
           break;
         }
         case AttributeType::INVALID: break;

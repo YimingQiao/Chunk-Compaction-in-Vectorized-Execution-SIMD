@@ -20,9 +20,12 @@
 
 namespace simd_compaction {
 
+namespace simd_compaction {
+const static __m512i ALL_NEG_ONE = _mm512_set1_epi64(-1);
 const static __m512i ALL_ZERO = _mm512_set1_epi64(0);
 const static __m512i ALL_ONE = _mm512_set1_epi64(1);
 const static __m512i ALL_EIGHT = _mm512_set1_epi64(8);
+const static __m512i ALL_SIXTEEN = _mm512_set1_epi64(16);
 
 // Some data structures
 using std::list;
@@ -31,9 +34,22 @@ using std::string;
 using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
+
+constexpr uint64_t kScale = 7;
+using std::vector;
 using idx_t = size_t;
 
-constexpr size_t kBlockSize = 204800;
+// work set = left data chunk (block) + right hash table
+constexpr size_t kBlockSize = 256 << kScale;
+constexpr uint64_t kRHSTuples = 128 << kScale;
+constexpr uint64_t kLHSTuples = 1024 << 15;
+constexpr uint64_t kHitFreq = 1;
+
+// query setting
+static size_t kJoins = 3;
+static size_t kLHSTupleSize = 8;
+static size_t kRHSTupleSize = 4;
+static size_t kChunkFactor = 2;
 
 // Attribute includes three types: integer, float-point number, and the string.
 using Attribute = int64_t;
@@ -54,6 +70,10 @@ class Vector {
   inline void Reference(Vector &other);
 
   Attribute &GetValue(size_t idx) { return (*data_)[idx]; }
+
+  inline void Reset() { count_ = 0; }
+
+  inline auto *Data() { return data_->data(); }
 
   Attribute &operator[](size_t idx) { return (*data_)[idx]; }
 };
