@@ -420,7 +420,7 @@ void ScanStructure::SIMDInOneNextInternal(Vector &join_key, DataChunk &input, Da
   vector<Vector *> cols{&result.data_[input.data_.size()], &result.data_[input.data_.size() + 1]};
 
   CycleProfiler::Get().Start();
-  
+
   for (size_t i = 0; i < count_ - tail; i += 8) {
     auto indices = _mm256_loadu_epi32(bucket_sel_vector_.data() + i);
     auto key_indices = _mm256_i32gather_epi32((int *) key_sel_vector_.data(), indices, 4);
