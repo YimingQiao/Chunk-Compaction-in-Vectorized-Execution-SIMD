@@ -2,10 +2,8 @@
 #include <iostream>
 #include <vector>
 
-#include "base.h"
 #include "chaining_ht.h"
 #include "linear_probing_ht.h"
-#include "setting.h"
 
 using namespace simd_compaction;
 
