@@ -146,9 +146,9 @@ void ExecutePipeline(DataChunk &input, PipelineState &state, DataCollection &res
   // -----------------------------------------------------------------------------------------------------
 #endif
 
-  auto ss = hts[level]->SIMDProbe(join_key, input.count_, input.selection_vector_);
+  auto ss = hts[level]->Probe(join_key, input.count_, input.selection_vector_);
   while (ss.HasNext()) {
-    ss.SIMDInOneNext(join_key, input, *result);
+    ss.Next(join_key, input, *result);
 
 #if defined(flag_full_compact) || defined(flag_binary_compact) || defined(flag_dynamic_compact)
     // A compactor sits here.
