@@ -34,15 +34,15 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-constexpr uint64_t kScale = 0;
+static size_t kScale = 0;
 using std::vector;
 using idx_t = size_t;
 
 // work set = left data chunk (block) + right hash table
-constexpr size_t kBlockSize = 256 << kScale;
-constexpr uint64_t kRHSTuples = 128 << kScale;
-constexpr uint64_t kLHSTuples = 1024 << 17;
-constexpr uint64_t kHitFreq = 1;
+static size_t kBlockSize = 256 << kScale;
+static size_t kRHSTuples = 128 << kScale;
+static size_t kLHSTuples = 1024 << 17;
+static size_t kHitFreq = 1;
 
 // query setting
 static size_t kJoins = 3;
