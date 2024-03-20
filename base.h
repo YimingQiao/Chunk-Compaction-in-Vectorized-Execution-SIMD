@@ -33,19 +33,19 @@ using std::unique_ptr;
 using std::unordered_map;
 using std::vector;
 
-static size_t kScale = 0;
+inline size_t kScale = 0;
 
 // work set = left data chunk (block) + right hash table
-static size_t kBlockSize = 256 << kScale;
-static size_t kRHSTuples = 128 << kScale;
-static size_t kLHSTuples = 1024 << 17;
-static size_t kHitFreq = 1;
+inline size_t kBlockSize = 256 << kScale;
+inline size_t kRHSTuples = 128 << kScale;
+inline size_t kLHSTuples = 1024 << 17;
+inline size_t kHitFreq = 1;
 
 // query setting
-static size_t kJoins = 3;
-static size_t kLHSTupleSize = 2e7;
-static size_t kRHSTupleSize = 2e6;
-static size_t kChunkFactor = 1;
+inline size_t kJoins = 3;
+inline size_t kLHSTupleSize = 2e7;
+inline size_t kRHSTupleSize = 2e6;
+inline size_t kChunkFactor = 1;
 
 // Attribute includes three types: integer, float-point number, and the string.
 using Attribute = int64_t;
