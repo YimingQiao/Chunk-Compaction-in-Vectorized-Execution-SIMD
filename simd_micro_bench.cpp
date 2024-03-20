@@ -50,6 +50,9 @@ void ParseParameters(int argc, char **argv) {
     }
   }
 
+  kBlockSize = 256 << kScale;
+  kRHSTuples = 128 << kScale;
+
   // show the setting, LHS: 64-bit keys. RHS: 64-bit keys, and 64-bit payloads
   PrintCacheSizes();
   std::cout << "------------------ Setting ------------------\n";
