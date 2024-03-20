@@ -10,6 +10,7 @@
 using namespace simd_compaction;
 
 void PrintCacheSizes() {
+  std::cout << "------------------ Arch ------------------\n";
   for (int i = 0; i < 3; ++i) {
     std::string path = "/sys/devices/system/cpu/cpu0/cache/index" + std::to_string(i) + "/size";
 
