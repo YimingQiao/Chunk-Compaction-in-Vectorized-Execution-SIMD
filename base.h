@@ -41,7 +41,7 @@ using idx_t = size_t;
 // work set = left data chunk (block) + right hash table
 constexpr size_t kBlockSize = 256 << kScale;
 constexpr uint64_t kRHSTuples = 128 << kScale;
-constexpr uint64_t kLHSTuples = 1024 << 15;
+constexpr uint64_t kLHSTuples = 1024 << 17;
 constexpr uint64_t kHitFreq = 1;
 
 // query setting
