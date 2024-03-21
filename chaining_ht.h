@@ -67,7 +67,7 @@ class ScanStructure {
 
   inline void AdvancePointers();
 
-  inline void GatherResult(vector<Vector *> cols, vector<uint32_t> &result_vector, size_t count);
+  inline void GatherResult(vector<Vector *> &cols, vector<uint32_t> &result_vector, size_t count);
 
   // ----------------------------  SIMD  ----------------------------
  public:
@@ -80,7 +80,7 @@ class ScanStructure {
 
   inline void SIMDAdvancePointers();
 
-  inline void SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &result_vector, size_t count);
+  inline void SIMDGatherResult(vector<Vector *> &cols, vector<uint32_t> &result_vector, size_t count);
 };
 
 class HashTable {
