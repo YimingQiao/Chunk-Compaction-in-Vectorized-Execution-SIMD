@@ -316,6 +316,8 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     new_count += _mm_popcnt_u32(valid);
   }
 
+  CycleProfiler::Get().End(1);
+
   for (size_t i = count_ - tail; i < count_; i++) {
     auto idx = slot_sel_vector_[i];
     auto &l_key = join_key.GetValue(join_key.selection_vector_[idx]);
@@ -333,8 +335,6 @@ size_t LPScanStructure::SIMDInOneNext(Vector &join_key, DataChunk &input, DataCh
     slot_sel_vector_[new_count] = idx;
     new_count += (slots_[id] != -1);
   }
-
-  CycleProfiler::Get().End(1);
 
   result.Slice(input, result_vector, result_count);
 
