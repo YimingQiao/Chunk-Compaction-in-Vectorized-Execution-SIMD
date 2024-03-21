@@ -66,7 +66,7 @@ class ScanStructure {
 
   inline void AdvancePointers();
 
-  inline void GatherResult(vector<Vector *> cols, vector<uint32_t> &result_vector, size_t count);
+  inline void GatherResult(vector<Vector *> &cols, vector<uint32_t> &result_vector, size_t count);
 
   void NextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
 
@@ -85,7 +85,7 @@ class ScanStructure {
 
   inline void SIMDAdvancePointers();
 
-  inline void SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, size_t count);
+  inline void SIMDGatherResult(vector<Vector *> &cols, vector<uint32_t> &sel_vector, size_t count);
 
   void SIMDInOneNextInternal(Vector &join_key, DataChunk &input, DataChunk &result);
 };

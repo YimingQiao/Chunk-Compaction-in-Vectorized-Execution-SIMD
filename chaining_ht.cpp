@@ -153,12 +153,12 @@ void ScanStructure::AdvancePointers() {
   CycleProfiler::Get().End(3);
 }
 
-void ScanStructure::GatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, size_t count) {
+void ScanStructure::GatherResult(vector<Vector *> &cols, vector<uint32_t> &result_vector, size_t count) {
   CycleProfiler::Get().Start();
 
   auto col_count = cols[0]->count_;
   for (size_t i = 0; i < count; ++i) {
-    auto idx = sel_vector[i];
+    auto idx = result_vector[i];
     cols[1]->GetValue(i + col_count) = (*iterators_[idx]);
   }
   cols[0]->count_ += count;
@@ -369,7 +369,7 @@ void ScanStructure::SIMDAdvancePointers() {
   CycleProfiler::Get().End(3);
 }
 
-void ScanStructure::SIMDGatherResult(vector<Vector *> cols, vector<uint32_t> &sel_vector, size_t count) {
+void ScanStructure::SIMDGatherResult(vector<Vector *> &cols, vector<uint32_t> &sel_vector, size_t count) {
   CycleProfiler::Get().Start();
 
   auto &col = *cols[1];
