@@ -25,11 +25,11 @@ void FlushPipelineCache(PipelineState &state, DataCollection &result_table, size
 
 std::vector<size_t> ParseList(const std::string &s);
 
-void ParseParameters(int argc, char *argv[]);
+int ParseParameters(int argc, char *argv[]);
 
 // example: compaction --join-num 4 --chunk-factor 5 --lhs-size 20000000 --rhs-size 2000000 --payload-length=[0,0,0,0]
 int main(int argc, char *argv[]) {
-  ParseParameters(argc, argv);
+  if (ParseParameters(argc, argv)) return 0;
 
   // random generator
   std::random_device rd;
@@ -187,7 +187,16 @@ void FlushPipelineCache(PipelineState &state, DataCollection &result_table, size
   FlushPipelineCache(state, result_table, level + 1);
 }
 
-void ParseParameters(int argc, char **argv) {
+void PrintHelp() {
+  std::cerr << "Usage: [program_name] [options]\n";
+  std::cerr << "Options:\n";
+  std::cerr << "  --join-num [value]        Number of joins\n";
+  std::cerr << "  --chunk-factor [value]    Chunk factor\n";
+  std::cerr << "  --lhs-size [value]        Size of LHS tuples\n";
+  std::cerr << "  --rhs-size [value]        Size of RHS tuples\n";
+}
+
+int ParseParameters(int argc, char **argv) {
   if (argc != 1) {
     for (int i = 1; i < argc; i++) {
       std::string arg(argv[i]);
@@ -214,6 +223,9 @@ void ParseParameters(int argc, char **argv) {
         }
       }
     }
+  } else {
+    PrintHelp();
+    return 1;
   }
 
   // show the setting
@@ -223,6 +235,8 @@ void ParseParameters(int argc, char **argv) {
             << "Number of LHS Tuple: " << kLHSTupleSize << "\n"
             << "Number of RHS Tuple: " << kRHSTupleSize << "\n"
             << "Chunk Factor: " << kChunkFactor << "\n";
+
+  return 0;
 }
 
 std::vector<size_t> ParseList(const string &s) {
