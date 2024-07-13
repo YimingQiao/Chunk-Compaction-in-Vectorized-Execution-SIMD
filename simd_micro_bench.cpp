@@ -24,7 +24,15 @@ void PrintCacheSizes() {
   }
 }
 
-void ParseParameters(int argc, char **argv) {
+void PrintHelp() {
+  std::cerr << "Usage: [program_name] [options]\n";
+  std::cerr << "Options:\n";
+  std::cerr << "  --scale [value]               Scalability of the test data size\n";
+  std::cerr << "  --hit-frequency [value]       How many tuples can find a match in the hash table\n";
+  std::cerr << "  --chunk-factor [value]        Chunk factor\n";
+}
+
+int ParseParameters(int argc, char **argv) {
   if (argc != 1) {
     for (int i = 1; i < argc; i++) {
       std::string arg(argv[i]);
@@ -46,6 +54,9 @@ void ParseParameters(int argc, char **argv) {
         }
       }
     }
+  } else {
+    PrintHelp();
+    return 1;
   }
 
   kBlockSize = 256 << kScale;
@@ -62,7 +73,7 @@ void ParseParameters(int argc, char **argv) {
 }
 
 int main(int argc, char *argv[]) {
-  ParseParameters(argc, argv);
+  if (ParseParameters(argc, argv)) return 0;
 
   std::vector<int64_t> keys(kLHSTuples);
   for (uint64_t i = 0; i < kLHSTuples; ++i) { keys[i] = rand() & (kRHSTuples * kHitFreq - 1); }
